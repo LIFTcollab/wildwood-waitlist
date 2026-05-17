@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  /* Surfaces & text */
+  --bg:             #f7f5f0;
+  --surface:        #ffffff;
+  --surface-warm:   #fbf9f4;
+  --surface-hover:  #f3efe6;
+  --border:         #e6e1d6;
+  --border-strong:  #d4cdb9;
+  --text:           #2a2a26;
+  --text-2:         #6b6859;
+  --text-3:         #9b9684;
+
+  /* Primary accent — forest green */
+  --green:          #4a7c59;
+  --green-deep:     #2f5641;
+  --green-soft:     #e3ede4;
+
+  /* Secondary accents — semantic */
+  --gold:           #c19b3a;
+  --gold-soft:      #f4ebd0;
+  --terra:          #c87856;
+  --terra-soft:     #f5e3da;
+  --blue:           #5a7a99;
+  --blue-soft:      #e2eaf2;
+  --gray-soft:      #ece9e0;
+}
+
+@theme inline {
+  --color-bg:            var(--bg);
+  --color-surface:       var(--surface);
+  --color-surface-warm:  var(--surface-warm);
+  --color-surface-hover: var(--surface-hover);
+  --color-border:        var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text:          var(--text);
+  --color-text-2:        var(--text-2);
+  --color-text-3:        var(--text-3);
+  --color-green:         var(--green);
+  --color-green-deep:    var(--green-deep);
+  --color-green-soft:    var(--green-soft);
+  --color-gold:          var(--gold);
+  --color-gold-soft:     var(--gold-soft);
+  --color-terra:         var(--terra);
+  --color-terra-soft:    var(--terra-soft);
+  --color-blue:          var(--blue);
+  --color-blue-soft:     var(--blue-soft);
+  --color-gray-soft:     var(--gray-soft);
+
+  --font-serif: var(--font-source-serif);
+  --font-sans:  var(--font-inter);
+  --font-mono:  var(--font-jetbrains-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}

@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wildwood — Hybrid Design (B + A + C)</title>
+<!-- HYBRID DESIGN
+     - Palette & tone:    Direction B (warm, cream/forest green/ochre)
+     - Table efficiency:  Direction A (compact rows, mono IDs, hover states)
+     - Metric viz:        Direction C (sparklines, deltas, semantic colors)
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Palette from B */
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --surface-warm: #fbf9f4;
+    --surface-hover: #f3efe6;
+    --border: #e6e1d6;
+    --border-strong: #d4cdb9;
+    --text: #2a2a26;
+    --text-2: #6b6859;
+    --text-3: #9b9684;
+    --green: #4a7c59;
+    --green-deep: #2f5641;
+    --green-soft: #e3ede4;
+    --terra: #c87856;
+    --terra-soft: #f5e3da;
+    --gold: #c19b3a;
+    --gold-soft: #f4ebd0;
+    --blue: #5a7a99;
+    --blue-soft: #e2eaf2;
+    --gray-soft: #ece9e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+
+  /* Sidebar — B's warm cream */
+  .sidebar {
+    background: var(--surface-warm);
+    border-right: 1px solid var(--border);
+    padding: 22px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 11px;
+  }
+  .brand-mark {
+    width: 32px; height: 32px;
+    background: var(--green);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 1px 3px rgba(74,124,89,0.25);
+  }
+  .brand-mark svg { width: 18px; height: 18px; color: white; }
+  .brand-text {
+    font-family: 'Source Serif 4', serif;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+  .brand-sub {
+    font-size: 11px;
+    color: var(--text-3);
+    font-style: italic;
+    font-family: 'Source Serif 4', serif;
+    margin-top: 1px;
+  }
+
+  /* A's denser nav, B's warm coloring */
+  .nav-section { padding: 6px 12px 10px; }
+  .nav-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-3);
+    padding: 8px 10px 4px;
+    font-weight: 600;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13.5px;
+    color: var(--text-2);
+    margin: 1px 0;
+    transition: all 0.12s;
+  }
+  .nav-item:hover { background: rgba(74,124,89,0.06); color: var(--text); }
+  .nav-item.active {
+    background: var(--green-soft);
+    color: var(--green-deep);
+    font-weight: 500;
+  }
+  .nav-icon {
+    width: 14px;
+    font-size: 13px;
+    color: var(--text-3);
+  }
+  .nav-item.active .nav-icon { color: var(--green); }
+  .nav-count {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .nav-item.active .nav-count { color: var(--green); }
+  .term-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* User card (B style) */
+  .user-card {
+    position: absolute;
+    bottom: 20px;
+    left: 12px; right: 12px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .user-card:hover { background: var(--surface-warm); }
+  .user-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a3c4ae, #4a7c59);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+  .user-name { font-size: 13px; font-weight: 500; line-height: 1.2; }
+  .user-role { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .user-menu { margin-left: auto; color: var(--text-3); font-size: 11px; }
+
+  /* Main */
+  .main { background: var(--bg); }
+
+  /* A's compact topbar with B's warm aesthetic */
+  .topbar {
+    padding: 12px 28px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 52px;
+  }
+  .breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .breadcrumb .sep { color: var(--text-3); }
+  .breadcrumb .current { color: var(--text); font-weight: 500; }
+  .breadcrumb .greeting {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    color: var(--text-2);
+    margin-left: 4px;
+  }
+  .breadcrumb .greeting em { color: var(--green-deep); font-style: italic; font-weight: 500; }
+
+  .topbar-tools { display: flex; gap: 6px; align-items: center; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 13px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn:hover { background: var(--surface-warm); border-color: var(--text-3); }
+  .btn-primary {
+    background: var(--green);
+    color: white;
+    border-color: var(--green);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset;
+  }
+  .btn-primary:hover { background: var(--green-deep); border-color: var(--green-deep); }
+  .btn-ghost { border-color: transparent; }
+  .btn-ghost:hover { background: var(--surface-warm); }
+  .kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-3);
+    padding: 1px 5px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface-warm);
+    margin-left: 4px;
+  }
+
+  /* Page content */
+  .content { padding: 22px 28px 60px; max-width: 1500px; }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 22px;
+  }
+  .page-title {
+    font-family: 'Source Serif 4', serif;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+  .page-subtitle {
+    font-size: 13px;
+    color: var(--text-2);
+    margin-top: 6px;
+  }
+  .page-meta {
+    font-size: 12px;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .live-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(74,124,89,0.15);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(74,124,89,0.15); }
+    50% { box-shadow: 0 0 0 5px rgba(74,124,89,0.08); }
+  }
+
+  /* ===== STATS — C's visual richness, B's warm colors ===== */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .stat:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+  }
+  .stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .stat-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-2);
+  }
+  .stat-delta {
+    font-size: 11.5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--green);
+    display: flex; align-items: center; gap: 3px;
+  }
+  .stat-delta.warn { color: var(--terra); }
+  .stat-delta.muted { color: var(--text-3); }
+  .stat-value {
+    font-family: 'Source Serif 4', serif;
+    font-size: 38px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  /* Sparkline (C) but with B colors */
+  .stat-sparkline {
+    height: 24px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+  .spark {
+    flex: 1;
+    background: var(--green-soft);
+    border-radius: 1px;
+    min-height: 3px;
+    transition: background 0.15s;
+  }
+  .spark.tall { background: var(--green); }
+  .spark.warn-soft { background: var(--gold-soft); }
+  .spark.warn-tall { background: var(--gold); }
+  .spark.coral-soft { background: var(--terra-soft); }
+  .spark.coral-tall { background: var(--terra); }
+  .spark.cool-soft { background: var(--blue-soft); }
+  .spark.cool-tall { background: var(--blue); }
+
+  .stat-sub {
+    font-size: 11.5px;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ===== TOOLBAR — A's structure with B's warmth ===== */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 280px;
+  }
+  .search {
+    width: 100%;
+    padding: 6px 11px 6px 30px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--surface);
+    font: inherit;
+    font-size: 13px;
+    transition: border-color 0.12s;
+  }
+  .search:focus { outline: none; border-color: var(--green); }
+  .search-icon {
+    position: absolute;
+    left: 10px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-3);
+    font-size: 12px;
+  }
+  .filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    font-size: 12.5px;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .filter-pill:hover { border-color: var(--text-3); color: var(--text); }
+  .filter-pill.active {
+    background: var(--green-soft);
+    color: var(--green-deep);
+    border-color: transparent;
+    font-weight: 500;
+  }
+  .filter-pill .x { color: var(--text-3); margin-left: 2px; cursor: pointer; }
+  .filter-pill.active .x { color: var(--green); }
+  .toolbar-right { margin-left: auto; display: flex; gap: 6px; }
+
+  /* ===== TABLE — A's compact, scannable layout, B's warm visual treatment ===== */
+  .table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-2);
+    background: var(--surface-warm);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-warm); cursor: pointer; }
+
+  .row-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    width: 40px;
+  }
+
+  /* Child cell — B's serif name, A's compact layout */
+  .child-cell { display: flex; align-items: center; gap: 11px; }
+  .child-avatar {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #d8e7d4, #a3c4ae);
+    color: var(--green-deep);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .child-avatar.v2 { background: linear-gradient(135deg, #f5d4c3, #c87856); color: #8b3e1c; }
+  .child-avatar.v3 { background: linear-gradient(135deg, #f4e2b0, #c19b3a); color: #6e5118; }
+  .child-avatar.v4 { background: linear-gradient(135deg, #c8d8e8, #5a7a99); color: #2c4256; }
+  .child-avatar.v5 { background: linear-gradient(135deg, #d4cdb9, #6b6859); color: white; }
+
+  .child-name {
+    font-family: 'Source Serif 4', serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .child-meta {
+    font-size: 11.5px;
+    color: var(--text-3);
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Pills — B's softness, A's compactness */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+  .pill-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .pill-teacher { background: var(--green-soft); color: var(--green-deep); }
+  .pill-teacher .pill-dot { background: var(--green); }
+  .pill-alumni { background: var(--gold-soft); color: #7a5e15; }
+  .pill-alumni .pill-dot { background: var(--gold); }
+  .pill-board { background: var(--terra-soft); color: #8b3e1c; }
+  .pill-board .pill-dot { background: var(--terra); }
+  .pill-sibling { background: var(--blue-soft); color: var(--blue); }
+  .pill-sibling .pill-dot { background: var(--blue); }
+  .pill-regular { background: var(--gray-soft); color: var(--text-2); }
+  .pill-regular .pill-dot { background: var(--text-3); }
+
+  /* Status — A's text-with-dot approach, B's colors */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+  .status::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .status.waitlisted { color: var(--gold); }
+  .status.waitlisted::before { background: var(--gold); }
+  .status.enrolled { color: var(--green); }
+  .status.enrolled::before { background: var(--green); }
+  .status.declined { color: var(--terra); }
+  .status.declined::before { background: var(--terra); }
+  .status.inactive { color: var(--text-3); }
+  .status.inactive::before { background: var(--text-3); }
+
+  /* Mono cells */
+  .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .notes-cell {
+    color: var(--text-2);
+    font-size: 12.5px;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Footer */
+  .table-footer {
+    padding: 11px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .table-footer .mono-count {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Section header */
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 26px 0 14px;
+  }
+  .section-title {
+    font-family: 'Source Serif 4', serif;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .section-meta {
+    font-size: 12px;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @media (max-width: 1000px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C12 2 7 6 7 12c0 4 2.5 7 5 7s5-3 5-7c0-6-5-10-5-10z" opacity="0.4"/>
+          <path d="M12 2v20" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <path d="M12 8c0 0-3 1-3 4M12 8c0 0 3 1 3 4M12 14c0 0-2 1-2 3M12 14c0 0 2 1 2 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-text">Wildwood</div>
+        <div class="brand-sub">Waitlist & enrollment</div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-item active">
+        <span class="nav-icon">⊞</span>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">☰</span>
+        <span>All children</span>
+        <span class="nav-count">293</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">✓</span>
+        <span>Tasks</span>
+        <span class="nav-count">11</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">♡</span>
+        <span>Families</span>
+        <span class="nav-count">180</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Terms</div>
+      <div class="nav-item">
+        <span class="term-dot" style="background: var(--green);"></span>
+        <span>Fall 25–26</span>
+        <span class="nav-count">38</span>
+      </div>
+      <div class="nav-item">
+        <span class="term-dot" style="background: var(--gold);"></span>
+        <span>Fall 26–27</span>
+        <span class="nav-count">72</span>
+      </div>
+      <div class="nav-item">
+        <span class="term-dot" style="background: var(--terra);"></span>
+        <span>Fall 27–28</span>
+        <span class="nav-count">147</span>
+      </div>
+      <div class="nav-item">
+        <span class="term-dot" style="background: var(--blue);"></span>
+        <span>Fall 28–29</span>
+        <span class="nav-count">28</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Workspace</div>
+      <div class="nav-item"><span class="nav-icon">⚙</span><span>Settings</span></div>
+      <div class="nav-item"><span class="nav-icon">◯</span><span>Staff users</span></div>
+    </div>
+
+    <div class="user-card">
+      <div class="user-avatar">SD</div>
+      <div>
+        <div class="user-name">Steve D'Amico</div>
+        <div class="user-role">Admin · Wildwood</div>
+      </div>
+      <div class="user-menu">⌄</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="breadcrumb">
+        <span>Wildwood</span>
+        <span class="sep">/</span>
+        <span class="current">Dashboard</span>
+        <span class="greeting">— good morning, <em>Steve</em></span>
+      </div>
+      <div class="topbar-tools">
+        <button class="btn btn-ghost">Filter <span class="kbd">F</span></button>
+        <button class="btn">Export</button>
+        <button class="btn btn-primary">+ Add child</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <div class="page-subtitle">293 children across 5 terms · 11 open tasks</div>
+        </div>
+        <div class="page-meta">
+          <span class="live-dot"></span>
+          <span>LIVE</span>
+          <span>·</span>
+          <span>updated 2s ago</span>
+        </div>
+      </div>
+
+      <!-- Stats — C's structure (sparklines, deltas) with B's palette -->
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-header">
+            <div class="stat-label">On waitlist</div>
+            <div class="stat-delta">↑ 4.3%</div>
+          </div>
+          <div class="stat-value">293</div>
+          <div class="stat-sparkline">
+            <div class="spark" style="height:30%"></div>
+            <div class="spark" style="height:42%"></div>
+            <div class="spark" style="height:38%"></div>
+            <div class="spark" style="height:55%"></div>
+            <div class="spark" style="height:50%"></div>
+            <div class="spark" style="height:68%"></div>
+            <div class="spark tall" style="height:82%"></div>
+            <div class="spark tall" style="height:100%"></div>
+          </div>
+          <div class="stat-sub">+12 last 30 days</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-header">
+            <div class="stat-label">Enrolled · Fall 25-26</div>
+            <div class="stat-delta muted">capacity</div>
+          </div>
+          <div class="stat-value">38</div>
+          <div class="stat-sparkline">
+            <div class="spark warn-soft" style="height:55%"></div>
+            <div class="spark warn-soft" style="height:62%"></div>
+            <div class="spark warn-soft" style="height:70%"></div>
+            <div class="spark warn-soft" style="height:78%"></div>
+            <div class="spark warn-soft" style="height:84%"></div>
+            <div class="spark warn-tall" style="height:88%"></div>
+            <div class="spark warn-tall" style="height:92%"></div>
+            <div class="spark warn-tall" style="height:100%"></div>
+          </div>
+          <div class="stat-sub">100% · waitlist closed</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-header">
+            <div class="stat-label">Open tasks</div>
+            <div class="stat-delta warn">3 urgent</div>
+          </div>
+          <div class="stat-value">11</div>
+          <div class="stat-sparkline">
+            <div class="spark coral-soft" style="height:60%"></div>
+            <div class="spark coral-soft" style="height:45%"></div>
+            <div class="spark coral-soft" style="height:70%"></div>
+            <div class="spark coral-soft" style="height:38%"></div>
+            <div class="spark coral-soft" style="height:55%"></div>
+            <div class="spark coral-soft" style="height:75%"></div>
+            <div class="spark coral-soft" style="height:52%"></div>
+            <div class="spark coral-tall" style="height:65%"></div>
+          </div>
+          <div class="stat-sub">avg age 3.2 days</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-header">
+            <div class="stat-label">Active families</div>
+            <div class="stat-delta">↑ 2.1%</div>
+          </div>
+          <div class="stat-value">180</div>
+          <div class="stat-sparkline">
+            <div class="spark cool-soft" style="height:38%"></div>
+            <div class="spark cool-soft" style="height:52%"></div>
+            <div class="spark cool-soft" style="height:48%"></div>
+            <div class="spark cool-soft" style="height:62%"></div>
+            <div class="spark cool-soft" style="height:68%"></div>
+            <div class="spark cool-soft" style="height:72%"></div>
+            <div class="spark cool-tall" style="height:85%"></div>
+            <div class="spark cool-tall" style="height:92%"></div>
+          </div>
+          <div class="stat-sub">244 parents · 1.36 avg/family</div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2 class="section-title">Priority children — Fall 27–28</h2>
+        <span class="section-meta">147 results</span>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input class="search" placeholder="Search children, families, notes…">
+        </div>
+        <div class="filter-pill active">Term: Fall 27–28 <span class="x">×</span></div>
+        <div class="filter-pill active">Status: Waitlisted <span class="x">×</span></div>
+        <div class="filter-pill">+ Add filter</div>
+        <div class="toolbar-right">
+          <button class="btn btn-ghost">Sort: Priority</button>
+          <button class="btn btn-ghost">Group: None</button>
+        </div>
+      </div>
+
+      <!-- Table (A's structure, B's warmth) -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th>Child</th>
+              <th>Priority</th>
+              <th>Term</th>
+              <th>Status</th>
+              <th>Classroom</th>
+              <th>Applied</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-id">001</td>
+              <td>
+                <div class="child-cell">
+                  <div class="child-avatar">MD</div>
+                  <div>
+                    <div class="child-name">Mia D'Noffrio</div>
+                    <div class="child-meta">b. 2025-06-19 · 11mo</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-teacher"><span class="pill-dot"></span>Teacher</span></td>
+              <td class="mono">Fall 27-28</td>
+              <td><span class="status waitlisted">Waitlisted</span></td>
+              <td class="mono">Younger Dome</td>
+              <td class="mono">Jan 1, 2025</td>
+              <td class="notes-cell">Teacher's child, save a spot</td>
+            </tr>
+            <tr>
+              <td class="row-id">002</td>
+              <td>
+                <div class="child-cell">
+                  <div class="child-avatar v2">PD</div>
+                  <div>
+                    <div class="child-name">Piers Doremus</div>
+                    <div class="child-meta">dob unknown</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-alumni"><span class="pill-dot"></span>Alumni</span></td>
+              <td class="mono">Fall 27-28</td>
+              <td><span class="status waitlisted">Waitlisted</span></td>
+              <td class="mono">Younger Dome</td>
+              <td class="mono">Jan 1, 2023</td>
+              <td class="notes-cell">Hoping to move to Aspen, will check 27-28</td>
+            </tr>
+            <tr>
+              <td class="row-id">003</td>
+              <td>
+                <div class="child-cell">
+                  <div class="child-avatar v3">MS</div>
+                  <div>
+                    <div class="child-name">Margot Seguin</div>
+                    <div class="child-meta">b. 2024-05-14 · 1y 11m</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-alumni"><span class="pill-dot"></span>Alumni</span></td>
+              <td class="mono">Fall 27-28</td>
+              <td><span class="status waitlisted">Waitlisted</span></td>
+              <td class="mono">Younger Dome</td>
+              <td class="mono">Jan 1, 2023</td>
+              <td class="notes-cell">Can't start until Nov 14, '26</td>
+            </tr>
+            <tr>
+              <td class="row-id">004</td>
+              <td>
+                <div class="child-cell">
+                  <div class="child-avatar v4">GM</div>
+                  <div>
+                    <div class="child-name">Grayson Means</div>
+                    <div class="child-meta">b. 2023-09-27 · 2y 7m</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-alumni"><span class="pill-dot"></span>Alumni</span></td>
+              <td class="mono">Fall 27-28</td>
+              <td><span class="status waitlisted">Waitlisted</span></td>
+              <td class="mono">Younger Dome</td>
+              <td class="mono">Feb 1, 2023</td>
+              <td class="notes-cell">Turns 2.5 end of March, try 27-28</td>
+            </tr>
+            <tr>
+              <td class="row-id">005</td>
+              <td>
+                <div class="child-cell">
+                  <div class="child-avatar">SG</div>
+                  <div>
+                    <div class="child-name">Sebastian Goldberg</div>
+                    <div class="child-meta">b. 2023-09-07 · 2y 8m</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-alumni"><span class="pill-dot"></span>Alumni</span></td>
+              <td class="mono">Fall 27-28</td>
+              <td><span class="status waitlisted">Waitlisted</span></td>
+              <td class="mono">Younger Dome</td>
+              <td class="mono">May 1, 2023</td>
+              <td class="notes-cell">Wants fall 27 when he's 4. JCC through 26-27</td>
+            </tr>
+            <tr>
+              <td class="row-id">006</td>
+              <td>
+                <div class="child-cell">
+                  <div class="child-avatar v5">BG</div>
+                  <div>
+                    <div class="child-name">Baby Girl Doremus</div>
+                    <div class="child-meta">b. 2023-03-01 · 3y 2m</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-alumni"><span class="pill-dot"></span>Alumni</span></td>
+              <td class="mono">Fall 27-28</td>
+              <td><span class="status waitlisted">Waitlisted</span></td>
+              <td class="mono">Younger Dome</td>
+              <td class="mono">Jan 1, 2023</td>
+              <td class="notes-cell">Hoping to move to Aspen</td>
+            </tr>
+            <tr>
+              <td class="row-id">007</td>
+              <td>
+                <div class="child-cell">
+                  <div class="child-avatar v2">PI</div>
+                  <div>
+                    <div class="child-name">Phoenix Isaac</div>
+                    <div class="child-meta">b. 2021-12-15 · 4y 5m</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="pill pill-alumni"><span class="pill-dot"></span>Alumni</span></td>
+              <td class="mono">Fall 26-27</td>
+              <td><span class="status declined">Declined</span></td>
+              <td class="mono">Older Dome</td>
+              <td class="mono">Jul 1, 2023</td>
+              <td class="notes-cell">Matt went to WW, eligible for UPK</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="table-footer">
+          <span class="mono-count">Showing 1–7 of 147</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-ghost">← Prev</button>
+            <button class="btn btn-ghost">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
