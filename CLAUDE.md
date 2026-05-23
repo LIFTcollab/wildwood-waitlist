@@ -1,6 +1,6 @@
 # Wildwood Waitlist
 
-A web app for Wildwood, a nature-based preschool, to manage their waitlist of children. Staff (Admin, Director, Viewer roles) review applicants, manage families, and track tasks across multiple academic terms.
+A web app for Wildwood, a Waldorf-inspired preschool, to manage their waitlist of children. Staff (Admin, Director, Viewer roles) review applicants, manage families, and track tasks across multiple academic terms.
 
 ---
 
