@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import SignOutButton from "@/components/dashboard/SignOutButton";
+import { SidebarNav } from "@/components/dashboard/SidebarNav";
 
 const TERM_CSS_VARS = ["--green", "--gold", "--terra", "--blue"] as const;
 
@@ -93,12 +94,7 @@ export default async function DashboardLayout({
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
           {/* Main nav */}
-          <div className="space-y-0.5">
-            <NavItem icon="⊞" label="Dashboard" active />
-            <NavItem icon="☰" label="All children" />
-            <NavItem icon="✓" label="Tasks" />
-            <NavItem icon="♡" label="Families" />
-          </div>
+          <SidebarNav />
 
           {/* Terms */}
           {terms && terms.length > 0 && (
@@ -131,8 +127,18 @@ export default async function DashboardLayout({
               Workspace
             </div>
             <div className="mt-1 space-y-0.5">
-              <NavItem icon="⚙" label="Settings" />
-              <NavItem icon="◯" label="Staff users" />
+              {[
+                { icon: "⚙", label: "Settings" },
+                { icon: "◯", label: "Staff users" },
+              ].map(({ icon, label }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13.5px] text-text-2 hover:bg-[rgba(74,124,89,0.06)] hover:text-text cursor-default transition-colors"
+                >
+                  <span className="text-[13px] text-text-3">{icon}</span>
+                  <span>{label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </nav>
@@ -162,27 +168,3 @@ export default async function DashboardLayout({
   );
 }
 
-function NavItem({
-  icon,
-  label,
-  active = false,
-}: {
-  icon: string;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13.5px] cursor-default transition-colors ${
-        active
-          ? "bg-green-soft text-green-deep font-medium"
-          : "text-text-2 hover:bg-[rgba(74,124,89,0.06)] hover:text-text"
-      }`}
-    >
-      <span className={`text-[13px] ${active ? "text-green" : "text-text-3"}`}>
-        {icon}
-      </span>
-      <span>{label}</span>
-    </div>
-  );
-}
