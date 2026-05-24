@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
-import type { WaitlistItem } from "@/lib/types/waitlist";
+import { useEffect, useState } from "react";
+import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { PriorityPill, StatusPill, formatDate } from "./WaitlistTable";
+import { updateWaitlistItem } from "@/app/actions/waitlist";
 
-// ─── Age helper ──────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STATUSES   = ["Enrolled", "Waitlisted", "Declined", "Inactive"] as const;
+const PRIORITIES = ["Board", "Teacher", "Alumni", "Sibling", "Regular"] as const;
+const CLASSROOMS = ["Younger Dome", "Older Dome"] as const;
+const PRIORITY_RANK: Record<string, number> = {
+  Board: 1, Teacher: 2, Alumni: 3, Sibling: 4, Regular: 5,
+};
+
+// ─── Age helper ───────────────────────────────────────────────────────────────
 
 function getAge(dob: string | null): string {
   if (!dob) return "—";
@@ -20,7 +30,7 @@ function getAge(dob: string | null): string {
   return `${years}y ${months}mo`;
 }
 
-// ─── Field row ───────────────────────────────────────────────────────────────
+// ─── Field wrapper ────────────────────────────────────────────────────────────
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -33,35 +43,166 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// ─── Panel ───────────────────────────────────────────────────────────────────
+// ─── Shared input / select styles ─────────────────────────────────────────────
+
+const inputCls =
+  "w-full px-2.5 py-1.5 bg-surface border border-border rounded-lg text-[13px] text-text focus:outline-none focus:border-green transition-colors";
+
+const selectCls =
+  inputCls +
+  " appearance-none pr-7 cursor-pointer";
+
+const selectStyle = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath stroke='%239b9684' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m1 1 4 4 4-4'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat" as const,
+  backgroundPosition: "right 10px center" as const,
+};
+
+// ─── Form state type ──────────────────────────────────────────────────────────
+
+type FormData = {
+  first_name: string;
+  last_name: string;
+  dob: string;
+  priority_status: string;
+  status: string;
+  classroom: string;
+  term_id: string;
+  date_applied: string;
+  notes: string;
+};
+
+function itemToForm(item: WaitlistItem): FormData {
+  return {
+    first_name:      item.first_name ?? "",
+    last_name:       item.last_name ?? "",
+    dob:             item.dob ?? "",
+    priority_status: item.priority_status ?? "",
+    status:          item.status ?? "",
+    classroom:       item.classroom ?? "",
+    term_id:         item.term_id ?? "",
+    date_applied:    item.date_applied ?? "",
+    notes:           item.notes ?? "",
+  };
+}
+
+// ─── Panel ────────────────────────────────────────────────────────────────────
 
 export function ChildDetailPanel({
   item,
+  terms,
+  canEdit,
   onClose,
+  onSave,
 }: {
   item: WaitlistItem | null;
+  terms: SchoolTerm[];
+  canEdit: boolean;
   onClose: () => void;
+  onSave: (updated: WaitlistItem) => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [form,      setForm]      = useState<FormData>(() =>
+    item ? itemToForm(item) : itemToForm({} as WaitlistItem)
+  );
+
+  // Reset edit state when a different item is opened
+  useEffect(() => {
+    if (!item) return;
+    setForm(itemToForm(item));
+    setIsEditing(false);
+    setSaving(false);
+    setSaveError(null);
+  }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Close on Escape
   useEffect(() => {
     if (!item) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (isEditing) { setIsEditing(false); setSaveError(null); }
+        else onClose();
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [item, onClose]);
+  }, [item, isEditing, onClose]);
 
   if (!item) return null;
 
-  const age = getAge(item.dob);
+  const age = getAge(isEditing ? form.dob || null : item.dob);
+
+  function set(key: keyof FormData) {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  }
+
+  async function handleSave() {
+    if (!item) return;
+    setSaving(true);
+    setSaveError(null);
+
+    const result = await updateWaitlistItem(item.id, {
+      first_name:      form.first_name,
+      last_name:       form.last_name,
+      dob:             form.dob || null,
+      priority_status: form.priority_status || null,
+      status:          form.status || null,
+      classroom:       form.classroom || null,
+      term_id:         form.term_id,
+      date_applied:    form.date_applied || null,
+      notes:           form.notes || null,
+    });
+
+    if (result.error) {
+      setSaveError(result.error);
+      setSaving(false);
+      return;
+    }
+
+    const termName = terms.find((t) => t.id === form.term_id)?.name ?? item.term_name;
+    const updated: WaitlistItem = {
+      ...item,
+      first_name:       form.first_name,
+      last_name:        form.last_name,
+      child_full_name:  `${form.first_name} ${form.last_name}`.trim(),
+      dob:              form.dob || null,
+      priority_status:  form.priority_status || null,
+      priority_rank:    PRIORITY_RANK[form.priority_status] ?? 99,
+      status:           form.status || null,
+      classroom:        form.classroom || null,
+      term_id:          form.term_id,
+      term_name:        termName ?? null,
+      date_applied:     form.date_applied || null,
+      notes:            form.notes || null,
+    };
+
+    onSave(updated);
+    setIsEditing(false);
+    setSaving(false);
+  }
+
+  function handleCancel() {
+    if (!item) return;
+    setForm(itemToForm(item));
+    setIsEditing(false);
+    setSaveError(null);
+  }
+
+  const displayName = isEditing
+    ? `${form.first_name} ${form.last_name}`.trim() || "—"
+    : item.child_full_name;
+
+  const displayDob = isEditing ? form.dob : item.dob;
 
   return (
     <>
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-text/10 z-40"
-        onClick={onClose}
+        onClick={isEditing ? undefined : onClose}
         aria-hidden="true"
       />
 
@@ -69,70 +210,154 @@ export function ChildDetailPanel({
       <div
         role="dialog"
         aria-label={`Details for ${item.child_full_name}`}
-        className="fixed right-0 top-0 h-full w-[380px] bg-surface border-l border-border z-50 shadow-2xl flex flex-col"
+        className="fixed right-0 top-0 h-full w-[400px] bg-surface border-l border-border z-50 shadow-2xl flex flex-col"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-5 border-b border-border flex-shrink-0">
-          <div className="min-w-0">
-            <h2 className="font-serif text-[22px] font-medium text-text leading-tight">
-              {item.child_full_name}
-            </h2>
-            {item.dob && (
-              <p className="font-mono text-[12px] text-text-3 mt-1">
-                b.&nbsp;{formatDate(item.dob)}&nbsp;·&nbsp;{age}
-              </p>
+          <div className="min-w-0 flex-1">
+            {isEditing ? (
+              <div className="flex gap-2">
+                <input
+                  value={form.first_name}
+                  onChange={set("first_name")}
+                  placeholder="First name"
+                  className={inputCls + " text-[15px] font-medium"}
+                />
+                <input
+                  value={form.last_name}
+                  onChange={set("last_name")}
+                  placeholder="Last name"
+                  className={inputCls + " text-[15px] font-medium"}
+                />
+              </div>
+            ) : (
+              <h2 className="font-serif text-[22px] font-medium text-text leading-tight">
+                {displayName}
+              </h2>
+            )}
+            {isEditing ? (
+              <div className="mt-2">
+                <input
+                  type="date"
+                  value={form.dob}
+                  onChange={set("dob")}
+                  className={inputCls + " font-mono text-[12px]"}
+                />
+              </div>
+            ) : (
+              displayDob && (
+                <p className="font-mono text-[12px] text-text-3 mt-1">
+                  b.&nbsp;{formatDate(displayDob)}&nbsp;·&nbsp;{age}
+                </p>
+              )
             )}
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close panel"
-            className="flex-shrink-0 mt-0.5 p-1.5 rounded-lg text-text-3 hover:text-text hover:bg-surface-hover transition-colors"
-          >
-            <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5">
-              <path
-                d="M1 1l12 12M13 1L1 13"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+
+          <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+            {canEdit && !isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              onClick={isEditing ? handleCancel : onClose}
+              aria-label={isEditing ? "Cancel edit" : "Close panel"}
+              className="p-1.5 rounded-lg text-text-3 hover:text-text hover:bg-surface-hover transition-colors"
+            >
+              <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5">
+                <path
+                  d="M1 1l12 12M13 1L1 13"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Priority */}
           <Field label="Priority">
-            <PriorityPill value={item.priority_status} />
+            {isEditing ? (
+              <select value={form.priority_status} onChange={set("priority_status")} className={selectCls} style={selectStyle}>
+                <option value="">— None</option>
+                {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            ) : (
+              <PriorityPill value={item.priority_status} />
+            )}
           </Field>
 
           {/* Status + Classroom */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Status">
-              <StatusPill value={item.status} />
+              {isEditing ? (
+                <select value={form.status} onChange={set("status")} className={selectCls} style={selectStyle}>
+                  <option value="">— None</option>
+                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : (
+                <StatusPill value={item.status} />
+              )}
             </Field>
             <Field label="Classroom">
-              <p className="font-mono text-[12.5px] text-text-2 leading-snug">
-                {item.classroom ?? "—"}
-              </p>
+              {isEditing ? (
+                <select value={form.classroom} onChange={set("classroom")} className={selectCls} style={selectStyle}>
+                  <option value="">— None</option>
+                  {CLASSROOMS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              ) : (
+                <p className="font-mono text-[12.5px] text-text-2 leading-snug">
+                  {item.classroom ?? "—"}
+                </p>
+              )}
             </Field>
           </div>
 
           {/* Term */}
           <Field label="Term">
-            <p className="text-[13.5px] text-text-2">{item.term_name ?? "—"}</p>
+            {isEditing ? (
+              <select value={form.term_id} onChange={set("term_id")} className={selectCls} style={selectStyle}>
+                <option value="">— Select term</option>
+                {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            ) : (
+              <p className="text-[13.5px] text-text-2">{item.term_name ?? "—"}</p>
+            )}
           </Field>
 
           {/* Applied */}
           <Field label="Date applied">
-            <p className="font-mono text-[12.5px] text-text-2">
-              {item.date_applied ? formatDate(item.date_applied) : "—"}
-            </p>
+            {isEditing ? (
+              <input
+                type="date"
+                value={form.date_applied}
+                onChange={set("date_applied")}
+                className={inputCls + " font-mono text-[12px]"}
+              />
+            ) : (
+              <p className="font-mono text-[12.5px] text-text-2">
+                {item.date_applied ? formatDate(item.date_applied) : "—"}
+              </p>
+            )}
           </Field>
 
           {/* Notes */}
           <Field label="Notes">
-            {item.notes ? (
+            {isEditing ? (
+              <textarea
+                value={form.notes}
+                onChange={set("notes")}
+                rows={4}
+                placeholder="Add notes…"
+                className={inputCls + " resize-none leading-relaxed"}
+              />
+            ) : item.notes ? (
               <p className="text-[13.5px] text-text-2 leading-relaxed whitespace-pre-wrap">
                 {item.notes}
               </p>
@@ -140,7 +365,32 @@ export function ChildDetailPanel({
               <p className="text-[13.5px] text-text-3 italic">No notes</p>
             )}
           </Field>
+
+          {/* Save error */}
+          {saveError && (
+            <p className="text-[12.5px] text-terra leading-snug">{saveError}</p>
+          )}
         </div>
+
+        {/* Footer — edit mode only */}
+        {isEditing && (
+          <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-end gap-3">
+            <button
+              onClick={handleCancel}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg text-[13px] text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-green hover:bg-green-deep transition-colors disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

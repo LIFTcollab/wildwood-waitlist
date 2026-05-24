@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { ChildDetailPanel } from "./ChildDetailPanel";
 
-// ─── Semantic color maps ────────────────────────────────────────────────────
+// ─── Semantic color maps ─────────────────────────────────────────────────────
 
 const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
   Board:   { bg: "bg-terra-soft",  text: "text-terra" },
@@ -27,10 +27,12 @@ const CLASSROOMS = ["Younger Dome", "Older Dome"] as const;
 
 const PER_PAGE = 25;
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+type SortKey = "child_full_name" | "priority_rank" | "term_name" | "status" | "classroom" | "date_applied";
+type SortDir = "asc" | "desc";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function formatDate(iso: string): string {
-  // Parse as local date to avoid off-by-one from UTC conversion
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", {
     month: "short",
@@ -39,55 +41,133 @@ export function formatDate(iso: string): string {
   });
 }
 
-// ─── Filter select ──────────────────────────────────────────────────────────
+// ─── Multi-select filter dropdown ─────────────────────────────────────────────
 
-function FilterSelect({
+function MultiSelectFilter({
   label,
-  value,
+  plural,
   options,
+  selected,
   onChange,
 }: {
   label: string;
-  value: string;
+  plural: string;
   options: string[];
-  onChange: (v: string) => void;
+  selected: string[];
+  onChange: (v: string[]) => void;
 }) {
-  const active = value !== "All";
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutsideClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [open]);
+
+  function toggle(option: string) {
+    onChange(
+      selected.includes(option)
+        ? selected.filter((s) => s !== option)
+        : [...selected, option]
+    );
+  }
+
+  const isActive = selected.length > 0;
+  const buttonLabel =
+    selected.length === 0
+      ? `All ${plural}`
+      : selected.length === 1
+      ? `${label}: ${selected[0]}`
+      : `${plural} · ${selected.length}`;
+
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`px-3 py-1.5 rounded-lg text-[12.5px] border cursor-pointer appearance-none pr-7 focus:outline-none transition-colors ${
-        active
-          ? "bg-green-soft border-green text-green-deep font-medium"
-          : "bg-surface border-border text-text-2 hover:border-border-strong"
-      }`}
-      style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath stroke='%239b9684' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m1 1 4 4 4-4'/%3E%3C/svg%3E")`,
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "right 10px center",
-      }}
-    >
-      <option value="All">All {label}s</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] border cursor-pointer focus:outline-none transition-colors ${
+          isActive
+            ? "bg-green-soft border-green text-green-deep font-medium"
+            : "bg-surface border-border text-text-2 hover:border-border-strong"
+        }`}
+      >
+        {buttonLabel}
+        <svg
+          viewBox="0 0 10 6"
+          fill="none"
+          className={`w-2.5 h-1.5 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""} ${isActive ? "text-green" : "text-text-3"}`}
+        >
+          <path d="m1 1 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-20 bg-surface border border-border rounded-xl shadow-lg py-1.5 min-w-[168px]">
+          {options.map((option) => {
+            const checked = selected.includes(option);
+            return (
+              <label
+                key={option}
+                className="flex items-center gap-2.5 px-3 py-[7px] hover:bg-surface-hover cursor-pointer"
+              >
+                <div
+                  className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+                    checked ? "bg-green border-green" : "border-border-strong bg-surface"
+                  }`}
+                >
+                  {checked && (
+                    <svg viewBox="0 0 10 8" fill="none" className="w-2 h-2">
+                      <path
+                        d="M1 4l3 3 5-6"
+                        stroke="white"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(option)}
+                  className="sr-only"
+                />
+                <span className="text-[13px] text-text leading-none">{option}</span>
+              </label>
+            );
+          })}
+
+          {selected.length > 0 && (
+            <>
+              <div className="border-t border-border mt-1.5 mb-1" />
+              <button
+                onClick={() => { onChange([]); setOpen(false); }}
+                className="w-full text-left px-3 py-1.5 text-[12px] text-text-3 hover:text-terra transition-colors"
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
-// ─── Status / priority pills ─────────────────────────────────────────────────
+// ─── Status / priority pills ──────────────────────────────────────────────────
 
 export function PriorityPill({ value }: { value: string | null }) {
   if (!value) return <span className="text-text-3">—</span>;
   const c = PRIORITY_COLORS[value];
   if (!c) return <span className="text-text-2 text-[12px]">{value}</span>;
   return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11.5px] font-medium ${c.bg} ${c.text}`}
-    >
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11.5px] font-medium ${c.bg} ${c.text}`}>
       {value}
     </span>
   );
@@ -98,85 +178,145 @@ export function StatusPill({ value }: { value: string | null }) {
   const c = STATUS_COLORS[value];
   if (!c) return <span className="text-text-2 text-[12px]">{value}</span>;
   return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11.5px] font-medium ${c.bg} ${c.text}`}
-    >
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11.5px] font-medium ${c.bg} ${c.text}`}>
       {value}
     </span>
   );
 }
 
-// ─── Main table component ────────────────────────────────────────────────────
+// ─── Sortable header cell ─────────────────────────────────────────────────────
+
+function SortTh({
+  label,
+  sortKey,
+  active,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: SortKey;
+  dir: SortDir;
+  onSort: (k: SortKey) => void;
+}) {
+  const isActive = active === sortKey;
+  return (
+    <th
+      className="px-4 py-3 text-[10.5px] uppercase tracking-wide cursor-pointer select-none group"
+      onClick={() => onSort(sortKey)}
+    >
+      <span className={`inline-flex items-center gap-1 font-semibold transition-colors ${isActive ? "text-green-deep" : "text-text-3 group-hover:text-text-2"}`}>
+        {label}
+        <span className="font-normal">
+          {isActive ? (dir === "asc" ? "↑" : "↓") : <span className="opacity-30">↕</span>}
+        </span>
+      </span>
+    </th>
+  );
+}
+
+// ─── Main table component ─────────────────────────────────────────────────────
 
 export function WaitlistTable({
-  items,
+  items: initialItems,
   terms,
+  canEdit,
 }: {
   items: WaitlistItem[];
   terms: SchoolTerm[];
+  canEdit: boolean;
 }) {
-  const [search, setSearch]               = useState("");
-  const [filterTerm, setFilterTerm]       = useState("All");
-  const [filterStatus, setFilterStatus]   = useState("All");
-  const [filterPriority, setFilterPriority] = useState("All");
-  const [filterClassroom, setFilterClassroom] = useState("All");
-  const [page, setPage]                   = useState(1);
-  const [selected, setSelected]           = useState<WaitlistItem | null>(null);
+  const [localItems, setLocalItems]         = useState<WaitlistItem[]>(initialItems);
+  const [search, setSearch]                 = useState("");
+  const [filterTerms, setFilterTerms]       = useState<string[]>([]);
+  const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+  const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
+  const [filterClassrooms, setFilterClassrooms] = useState<string[]>([]);
+  const [page, setPage]                     = useState(1);
+  const [selected, setSelected]             = useState<WaitlistItem | null>(null);
+  const [sortKey, setSortKey]               = useState<SortKey>("priority_rank");
+  const [sortDir, setSortDir]               = useState<SortDir>("asc");
+
+  function handleSave(updated: WaitlistItem) {
+    setLocalItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+    setSelected(updated);
+  }
+
+  function withPageReset(setter: (v: string[]) => void) {
+    return (v: string[]) => { setter(v); setPage(1); };
+  }
 
   const termNames = terms.map((t) => t.name);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return items.filter((item) => {
+    return localItems.filter((item) => {
       if (
         q &&
         !item.child_full_name.toLowerCase().includes(q) &&
         !(item.notes ?? "").toLowerCase().includes(q)
       )
         return false;
-      if (filterTerm !== "All" && item.term_name !== filterTerm) return false;
-      if (filterStatus !== "All" && item.status !== filterStatus) return false;
-      if (filterPriority !== "All" && item.priority_status !== filterPriority)
+      if (filterTerms.length > 0 && !filterTerms.includes(item.term_name ?? ""))
         return false;
-      if (filterClassroom !== "All" && item.classroom !== filterClassroom)
+      if (filterStatuses.length > 0 && !filterStatuses.includes(item.status ?? ""))
+        return false;
+      if (filterPriorities.length > 0 && !filterPriorities.includes(item.priority_status ?? ""))
+        return false;
+      if (filterClassrooms.length > 0 && !filterClassrooms.includes(item.classroom ?? ""))
         return false;
       return true;
     });
-  }, [items, search, filterTerm, filterStatus, filterPriority, filterClassroom]);
+  }, [localItems, search, filterTerms, filterStatuses, filterPriorities, filterClassrooms]);
 
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
+      if (sortKey === "priority_rank") {
+        return ((a.priority_rank ?? 99) - (b.priority_rank ?? 99)) * dir;
+      }
+      const aVal = (a[sortKey] ?? "") as string;
+      const bVal = (b[sortKey] ?? "") as string;
+      return aVal.localeCompare(bVal) * dir;
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages  = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
   const currentPage = Math.min(page, totalPages);
-  const pageItems   = filtered.slice(
+  const pageItems   = sorted.slice(
     (currentPage - 1) * PER_PAGE,
     currentPage * PER_PAGE
   );
 
   const hasFilters =
     search !== "" ||
-    filterTerm !== "All" ||
-    filterStatus !== "All" ||
-    filterPriority !== "All" ||
-    filterClassroom !== "All";
+    filterTerms.length > 0 ||
+    filterStatuses.length > 0 ||
+    filterPriorities.length > 0 ||
+    filterClassrooms.length > 0;
 
   function clearFilters() {
     setSearch("");
-    setFilterTerm("All");
-    setFilterStatus("All");
-    setFilterPriority("All");
-    setFilterClassroom("All");
+    setFilterTerms([]);
+    setFilterStatuses([]);
+    setFilterPriorities([]);
+    setFilterClassrooms([]);
     setPage(1);
-  }
-
-  function handleFilterChange<T>(setter: (v: T) => void) {
-    return (v: T) => {
-      setter(v);
-      setPage(1);
-    };
   }
 
   return (
     <div>
-      {/* ── Filter bar ─────────────────────────────────────────────────── */}
+      {/* ── Filter bar ──────────────────────────────────────────────────── */}
       <div className="mb-4 flex items-center gap-2 flex-wrap">
         {/* Search */}
         <div className="relative">
@@ -192,10 +332,7 @@ export function WaitlistTable({
             type="text"
             placeholder="Search name or notes…"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-[13px] text-text placeholder:text-text-3 focus:outline-none focus:border-green transition-colors w-[220px]"
           />
         </div>
@@ -203,30 +340,34 @@ export function WaitlistTable({
         {/* Divider */}
         <div className="h-6 w-px bg-border" />
 
-        {/* Filter selects */}
-        <FilterSelect
+        {/* Multi-select filters */}
+        <MultiSelectFilter
           label="Term"
-          value={filterTerm}
+          plural="Terms"
           options={termNames}
-          onChange={handleFilterChange(setFilterTerm)}
+          selected={filterTerms}
+          onChange={withPageReset(setFilterTerms)}
         />
-        <FilterSelect
+        <MultiSelectFilter
           label="Status"
-          value={filterStatus}
+          plural="Statuses"
           options={[...STATUSES]}
-          onChange={handleFilterChange(setFilterStatus)}
+          selected={filterStatuses}
+          onChange={withPageReset(setFilterStatuses)}
         />
-        <FilterSelect
+        <MultiSelectFilter
           label="Priority"
-          value={filterPriority}
+          plural="Priorities"
           options={[...PRIORITIES]}
-          onChange={handleFilterChange(setFilterPriority)}
+          selected={filterPriorities}
+          onChange={withPageReset(setFilterPriorities)}
         />
-        <FilterSelect
+        <MultiSelectFilter
           label="Classroom"
-          value={filterClassroom}
+          plural="Classrooms"
           options={[...CLASSROOMS]}
-          onChange={handleFilterChange(setFilterClassroom)}
+          selected={filterClassrooms}
+          onChange={withPageReset(setFilterClassrooms)}
         />
 
         {hasFilters && (
@@ -242,11 +383,11 @@ export function WaitlistTable({
       {/* Result count */}
       <div className="mb-2 font-mono text-[11.5px] text-text-3">
         {hasFilters
-          ? `${filtered.length} of ${items.length} entries`
-          : `${items.length} entries`}
+          ? `${filtered.length} of ${localItems.length} entries`
+          : `${localItems.length} entries`}
       </div>
 
-      {/* ── Table ──────────────────────────────────────────────────────── */}
+      {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
         <table className="w-full text-[13.5px] border-collapse">
           <thead>
@@ -254,24 +395,12 @@ export function WaitlistTable({
               <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide w-10">
                 #
               </th>
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
-                Child
-              </th>
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
-                Priority
-              </th>
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
-                Term
-              </th>
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
-                Status
-              </th>
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
-                Classroom
-              </th>
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
-                Applied
-              </th>
+              <SortTh label="Child"     sortKey="child_full_name" active={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortTh label="Priority"  sortKey="priority_rank"   active={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortTh label="Term"      sortKey="term_name"       active={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortTh label="Status"    sortKey="status"          active={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortTh label="Classroom" sortKey="classroom"       active={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortTh label="Applied"   sortKey="date_applied"    active={sortKey} dir={sortDir} onSort={handleSort} />
               <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
                 Notes
               </th>
@@ -280,10 +409,7 @@ export function WaitlistTable({
           <tbody>
             {pageItems.length === 0 ? (
               <tr>
-                <td
-                  colSpan={8}
-                  className="px-4 py-14 text-center text-text-3 text-sm"
-                >
+                <td colSpan={8} className="px-4 py-14 text-center text-text-3 text-sm">
                   No results match your filters.
                 </td>
               </tr>
@@ -294,21 +420,14 @@ export function WaitlistTable({
                 return (
                   <tr
                     key={item.id}
-                    onClick={() =>
-                      setSelected(isSelected ? null : item)
-                    }
+                    onClick={() => setSelected(isSelected ? null : item)}
                     className={`border-b border-border last:border-0 cursor-pointer transition-colors ${
-                      isSelected
-                        ? "bg-green-soft/50"
-                        : "hover:bg-surface-hover"
+                      isSelected ? "bg-green-soft/50" : "hover:bg-surface-hover"
                     }`}
                   >
-                    {/* # */}
                     <td className="px-4 py-2.5 font-mono text-text-3 text-[11.5px]">
                       {String(rowNum).padStart(2, "0")}
                     </td>
-
-                    {/* Child name + DOB */}
                     <td className="px-4 py-2.5">
                       <div className="font-serif font-medium text-text leading-tight">
                         {item.child_full_name}
@@ -319,33 +438,21 @@ export function WaitlistTable({
                         </div>
                       )}
                     </td>
-
-                    {/* Priority */}
                     <td className="px-4 py-2.5">
                       <PriorityPill value={item.priority_status} />
                     </td>
-
-                    {/* Term */}
                     <td className="px-4 py-2.5 text-text-2 text-[13px]">
                       {item.term_name ?? "—"}
                     </td>
-
-                    {/* Status */}
                     <td className="px-4 py-2.5">
                       <StatusPill value={item.status} />
                     </td>
-
-                    {/* Classroom */}
                     <td className="px-4 py-2.5 font-mono text-[11.5px] text-text-2">
                       {item.classroom ?? "—"}
                     </td>
-
-                    {/* Applied date */}
                     <td className="px-4 py-2.5 font-mono text-[11.5px] text-text-3">
                       {item.date_applied ? formatDate(item.date_applied) : "—"}
                     </td>
-
-                    {/* Notes (truncated) */}
                     <td className="px-4 py-2.5 max-w-[180px]">
                       {item.notes ? (
                         <span className="block truncate text-[12.5px] text-text-3">
@@ -363,7 +470,7 @@ export function WaitlistTable({
         </table>
       </div>
 
-      {/* ── Pagination ─────────────────────────────────────────────────── */}
+      {/* ── Pagination ──────────────────────────────────────────────────── */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between">
           <span className="font-mono text-[12px] text-text-3">
@@ -388,10 +495,13 @@ export function WaitlistTable({
         </div>
       )}
 
-      {/* ── Detail panel ───────────────────────────────────────────────── */}
+      {/* ── Detail panel ────────────────────────────────────────────────── */}
       <ChildDetailPanel
         item={selected}
+        terms={terms}
+        canEdit={canEdit}
         onClose={() => setSelected(null)}
+        onSave={handleSave}
       />
     </div>
   );
