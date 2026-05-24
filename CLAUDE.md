@@ -291,9 +291,19 @@ npm run build      # also catches type errors
 
 ---
 
-## Build Plan
+## Live App
 
-The initial build is tracked in `BUILD_PLAN.md`. When that's complete, this section will be updated to describe the live app and its features.
+Deployed at **https://wildwood-waitlist.vercel.app** (Vercel, auto-deploys on push to `main`).
+
+**v1 features:**
+- Magic link login (`/login`) — validates email via `check_email_exists` RPC, sends OTP via Resend
+- Protected dashboard (`/dashboard`) — server-side auth check, redirects to `/login` if unauthenticated
+- Sidebar with brand, nav, and term list (live from DB)
+- Editorial hero headline with total waitlist count spelled out
+- Four stat cards with decorative sparklines (waitlist, enrolled, tasks, families)
+- Four Recharts charts: by status (donut), by term (bar), priority distribution (horizontal bar), by classroom (donut)
+- Recent additions list (5 most recent waitlist items)
+- Sign out button in user card
 
 ---
 
@@ -304,3 +314,4 @@ Append decisions and notes here chronologically. Most recent at bottom.
 - *Pre-build:* Database schema designed and secured. RLS policies, anon-revocation, with-check constraints, rate-limit hardening, user_profiles_view restriction, search_path hardening on all SECURITY DEFINER functions, and pg_cron cleanup job all applied. Schema documented in `reference/wildwood_schema.sql`.
 - *2026-05-12:* Opted in to Supabase's new restrictive default privileges (announced Apr 28, 2026). New tables in `public` schema now require explicit `GRANT` statements before the Data API can see them. Existing tables unaffected.
 - *2026-05-12:* Design direction finalized as hybrid editorial-operational. Three prototypes evaluated (modern, warm, data); final design combines warm palette/tone (B), efficient table layouts (A), and visual metric components like sparklines (C). Reference: `reference/wildwood-hybrid.html`. Typography: Source Serif 4 + Inter + JetBrains Mono. Primary accent: forest green `#4a7c59`.
+- *2026-05-24:* v1 shipped. Login + dashboard live at wildwood-waitlist.vercel.app. All 9 BUILD_PLAN success criteria met. Key deploy notes: Next.js 16 uses `proxy.ts` as middleware locally but Vercel's edge infrastructure requires `middleware.ts` — renamed accordingly. `NEXT_PUBLIC_` env vars must NOT be marked Sensitive in Vercel (they are baked in at build time and Sensitive blocks that). Supabase CAPTCHA protection disabled (not implemented in v1 login form). BUILD_PLAN.md archived.
