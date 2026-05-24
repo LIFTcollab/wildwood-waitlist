@@ -25,7 +25,8 @@ const STATUSES   = ["Enrolled", "Waitlisted", "Declined", "Inactive"] as const;
 const PRIORITIES = ["Board", "Teacher", "Alumni", "Sibling", "Regular"] as const;
 const CLASSROOMS = ["Younger Dome", "Older Dome"] as const;
 
-const PER_PAGE = 25;
+const PER_PAGE_OPTIONS = [25, 50, 100] as const;
+type PerPage = typeof PER_PAGE_OPTIONS[number];
 
 type SortKey = "child_full_name" | "priority_rank" | "term_name" | "status" | "classroom" | "date_applied";
 type SortDir = "asc" | "desc";
@@ -233,6 +234,7 @@ export function WaitlistTable({
   const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
   const [filterClassrooms, setFilterClassrooms] = useState<string[]>([]);
   const [page, setPage]                     = useState(1);
+  const [perPage, setPerPage]               = useState<PerPage>(25);
   const [selected, setSelected]             = useState<WaitlistItem | null>(null);
   const [sortKey, setSortKey]               = useState<SortKey>("priority_rank");
   const [sortDir, setSortDir]               = useState<SortDir>("asc");
@@ -291,11 +293,11 @@ export function WaitlistTable({
     });
   }, [filtered, sortKey, sortDir]);
 
-  const totalPages  = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
+  const totalPages  = Math.max(1, Math.ceil(sorted.length / perPage));
   const currentPage = Math.min(page, totalPages);
   const pageItems   = sorted.slice(
-    (currentPage - 1) * PER_PAGE,
-    currentPage * PER_PAGE
+    (currentPage - 1) * perPage,
+    currentPage * perPage
   );
 
   const hasFilters =
@@ -378,6 +380,25 @@ export function WaitlistTable({
             Clear filters
           </button>
         )}
+
+        {/* Spacer + per-page selector */}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[12px] text-text-3">Show</span>
+          <select
+            value={perPage}
+            onChange={(e) => { setPerPage(Number(e.target.value) as PerPage); setPage(1); }}
+            className="px-2 py-1.5 bg-surface border border-border rounded-lg text-[12.5px] text-text-2 focus:outline-none focus:border-green transition-colors cursor-pointer appearance-none pr-6"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath stroke='%239b9684' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m1 1 4 4 4-4'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 8px center",
+            }}
+          >
+            {PER_PAGE_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n} per page</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Result count */}
@@ -415,7 +436,7 @@ export function WaitlistTable({
               </tr>
             ) : (
               pageItems.map((item, i) => {
-                const rowNum = (currentPage - 1) * PER_PAGE + i + 1;
+                const rowNum = (currentPage - 1) * perPage + i + 1;
                 const isSelected = selected?.id === item.id;
                 return (
                   <tr
