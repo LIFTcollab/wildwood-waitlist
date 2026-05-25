@@ -351,71 +351,83 @@ export function WaitlistTable({
 
   return (
     <div>
-      {/* ── Filter bar ──────────────────────────────────────────────────── */}
-      <div className="mb-4 flex items-center gap-2 flex-wrap">
-        {/* Search */}
-        <div className="relative">
-          <svg
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-3 pointer-events-none"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
-            <path d="m10.5 10.5 3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search name or notes…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-[13px] text-text placeholder:text-text-3 focus:outline-none focus:border-green transition-colors w-[220px]"
-          />
+      {/* ── Controls + bar (left) / per-page (right) ────────────────── */}
+      <div className="mb-4 flex items-start gap-3">
+
+        {/* Left column: filters stacked above the bar */}
+        <div className="flex-1 min-w-0 space-y-3">
+
+          {/* Filter row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Search */}
+            <div className="relative">
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-3 pointer-events-none"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
+                <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="m10.5 10.5 3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search name or notes…"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-[13px] text-text placeholder:text-text-3 focus:outline-none focus:border-green transition-colors w-[220px]"
+              />
+            </div>
+
+            {/* Divider */}
+            <div className="h-6 w-px bg-border" />
+
+            {/* Multi-select filters */}
+            <MultiSelectFilter label="Term"      plural="Terms"      options={termNames}        selected={filterTerms}      onChange={withPageReset(setFilterTerms)} />
+            <MultiSelectFilter label="Status"    plural="Statuses"   options={[...STATUSES]}    selected={filterStatuses}   onChange={withPageReset(setFilterStatuses)} />
+            <MultiSelectFilter label="Priority"  plural="Priorities" options={[...PRIORITIES]}  selected={filterPriorities} onChange={withPageReset(setFilterPriorities)} />
+            <MultiSelectFilter label="Classroom" plural="Classrooms" options={[...CLASSROOMS]}  selected={filterClassrooms} onChange={withPageReset(setFilterClassrooms)} />
+
+            {hasFilters && (
+              <button onClick={clearFilters} className="text-[12px] text-text-3 hover:text-terra transition-colors ml-1">
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {/* Stacked bar — same width as filter row above */}
+          {chartStats.total > 0 && (
+            <div>
+              <div className="flex h-3 rounded-full overflow-hidden">
+                {CHART_LEGEND.map((l) => {
+                  const count = chartStats[l.key];
+                  if (count === 0) return null;
+                  return (
+                    <div
+                      key={l.key}
+                      style={{ width: `${(count / chartStats.total) * 100}%`, background: l.color }}
+                      title={`${l.label}: ${count}`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex items-center gap-5 flex-wrap">
+                {CHART_LEGEND.map((l) => (
+                  <div key={l.label} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                    <span className="font-mono text-[12px] font-medium text-text">{chartStats[l.key]}</span>
+                    <span className="font-mono text-[12px] text-text-3">{l.label}</span>
+                  </div>
+                ))}
+                <span className="ml-auto font-mono text-[11.5px] text-text-3">
+                  {hasFilters ? `${filtered.length} of ${localItems.length}` : `${localItems.length}`} entries
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Divider */}
-        <div className="h-6 w-px bg-border" />
-
-        {/* Multi-select filters */}
-        <MultiSelectFilter
-          label="Term"
-          plural="Terms"
-          options={termNames}
-          selected={filterTerms}
-          onChange={withPageReset(setFilterTerms)}
-        />
-        <MultiSelectFilter
-          label="Status"
-          plural="Statuses"
-          options={[...STATUSES]}
-          selected={filterStatuses}
-          onChange={withPageReset(setFilterStatuses)}
-        />
-        <MultiSelectFilter
-          label="Priority"
-          plural="Priorities"
-          options={[...PRIORITIES]}
-          selected={filterPriorities}
-          onChange={withPageReset(setFilterPriorities)}
-        />
-        <MultiSelectFilter
-          label="Classroom"
-          plural="Classrooms"
-          options={[...CLASSROOMS]}
-          selected={filterClassrooms}
-          onChange={withPageReset(setFilterClassrooms)}
-        />
-
-        {hasFilters && (
-          <button
-            onClick={clearFilters}
-            className="text-[12px] text-text-3 hover:text-terra transition-colors ml-1"
-          >
-            Clear filters
-          </button>
-        )}
-
-        {/* Spacer + per-page selector */}
-        <div className="ml-auto flex items-center gap-2">
+        {/* Right column: per-page selector */}
+        <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
           <span className="text-[12px] text-text-3">Show</span>
           <select
             value={perPage}
@@ -432,44 +444,8 @@ export function WaitlistTable({
             ))}
           </select>
         </div>
+
       </div>
-
-      {/* ── Stacked status bar ──────────────────────────────────────── */}
-      {chartStats.total > 0 && (
-        <div className="mb-4">
-          {/* Bar */}
-          <div className="flex h-3 rounded-full overflow-hidden">
-            {CHART_LEGEND.map((l) => {
-              const count = chartStats[l.key];
-              if (count === 0) return null;
-              const pct = (count / chartStats.total) * 100;
-              return (
-                <div
-                  key={l.key}
-                  style={{ width: `${pct}%`, background: l.color }}
-                  title={`${l.label}: ${count}`}
-                />
-              );
-            })}
-          </div>
-
-          {/* Legend */}
-          <div className="mt-2.5 flex items-center gap-5 flex-wrap">
-            {CHART_LEGEND.map((l) => (
-              <div key={l.label} className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                <span className="font-mono text-[12px] font-medium text-text">{chartStats[l.key]}</span>
-                <span className="font-mono text-[12px] text-text-3">{l.label}</span>
-              </div>
-            ))}
-            <span className="ml-auto font-mono text-[11.5px] text-text-3">
-              {hasFilters
-                ? `${filtered.length} of ${localItems.length} entries`
-                : `${localItems.length} entries`}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
