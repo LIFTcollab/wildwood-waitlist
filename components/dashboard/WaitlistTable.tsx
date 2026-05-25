@@ -256,6 +256,19 @@ export function WaitlistTable({
   const [sortKey, setSortKey]               = useState<SortKey>("priority_rank");
   const [sortDir, setSortDir]               = useState<SortDir>("asc");
 
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const [barWidth, setBarWidth]             = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = controlsRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setBarWidth(el.getBoundingClientRect().width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   function handleSave(updated: WaitlistItem) {
     setLocalItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
     setSelected(updated);
@@ -351,14 +364,14 @@ export function WaitlistTable({
 
   return (
     <div>
-      {/* ── Controls + bar (left) / per-page (right) ────────────────── */}
-      <div className="mb-4 flex items-start gap-3">
+      {/* ── Controls ────────────────────────────────────────────────── */}
+      <div className="mb-4 flex flex-col gap-3">
 
-        {/* Left column: shrinks to content width so bar matches filter row */}
-        <div className="w-fit flex flex-col gap-3">
+        {/* Filter row: left controls (measured) + per-page at right edge */}
+        <div className="flex items-center gap-3">
 
-          {/* Filter row */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Left: search + filters — ref'd so bar can match this width */}
+          <div ref={controlsRef} className="flex items-center gap-2 flex-wrap flex-1">
             {/* Search */}
             <div className="relative">
               <svg
@@ -394,56 +407,58 @@ export function WaitlistTable({
             )}
           </div>
 
-          {/* Stacked bar — same width as filter row above */}
-          {chartStats.total > 0 && (
-            <div>
-              <div className="flex h-3 rounded-full overflow-hidden">
-                {CHART_LEGEND.map((l) => {
-                  const count = chartStats[l.key];
-                  if (count === 0) return null;
-                  return (
-                    <div
-                      key={l.key}
-                      style={{ width: `${(count / chartStats.total) * 100}%`, background: l.color }}
-                      title={`${l.label}: ${count}`}
-                    />
-                  );
-                })}
-              </div>
-              <div className="mt-2 flex items-center gap-5 flex-wrap">
-                {CHART_LEGEND.map((l) => (
-                  <div key={l.label} className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                    <span className="font-mono text-[12px] font-medium text-text">{chartStats[l.key]}</span>
-                    <span className="font-mono text-[12px] text-text-3">{l.label}</span>
-                  </div>
-                ))}
-                <span className="ml-auto font-mono text-[11.5px] text-text-3">
-                  {hasFilters ? `${filtered.length} of ${localItems.length}` : `${localItems.length}`} entries
-                </span>
-              </div>
-            </div>
-          )}
+          {/* Per-page selector — pinned to right edge */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-[12px] text-text-3">Show</span>
+            <select
+              value={perPage}
+              onChange={(e) => { setPerPage(Number(e.target.value) as PerPage); setPage(1); }}
+              className="px-2 py-1.5 bg-surface border border-border rounded-lg text-[12.5px] text-text-2 focus:outline-none focus:border-green transition-colors cursor-pointer appearance-none pr-6"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath stroke='%239b9684' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m1 1 4 4 4-4'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 8px center",
+              }}
+            >
+              {PER_PAGE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n} per page</option>
+              ))}
+            </select>
+          </div>
+
         </div>
 
-        {/* Right column: per-page selector */}
-        <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
-          <span className="text-[12px] text-text-3">Show</span>
-          <select
-            value={perPage}
-            onChange={(e) => { setPerPage(Number(e.target.value) as PerPage); setPage(1); }}
-            className="px-2 py-1.5 bg-surface border border-border rounded-lg text-[12.5px] text-text-2 focus:outline-none focus:border-green transition-colors cursor-pointer appearance-none pr-6"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath stroke='%239b9684' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m1 1 4 4 4-4'/%3E%3C/svg%3E")`,
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 8px center",
-            }}
-          >
-            {PER_PAGE_OPTIONS.map((n) => (
-              <option key={n} value={n}>{n} per page</option>
-            ))}
-          </select>
-        </div>
+        {/* Stacked bar — width pinned to the controls group above */}
+        {chartStats.total > 0 && (
+          <div style={{ width: barWidth != null ? `${barWidth}px` : "auto" }}>
+            <div className="flex h-3 gap-[2px]">
+              {CHART_LEGEND.map((l) => {
+                const count = chartStats[l.key];
+                if (count === 0) return null;
+                return (
+                  <div
+                    key={l.key}
+                    className="rounded-full"
+                    style={{ width: `${(count / chartStats.total) * 100}%`, background: l.color }}
+                    title={`${l.label}: ${count}`}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center gap-5 flex-wrap">
+              {CHART_LEGEND.map((l) => (
+                <div key={l.label} className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                  <span className="font-mono text-[12px] font-medium text-text">{chartStats[l.key]}</span>
+                  <span className="font-mono text-[12px] text-text-3">{l.label}</span>
+                </div>
+              ))}
+              <span className="ml-auto font-mono text-[11.5px] text-text-3">
+                {hasFilters ? `${filtered.length} of ${localItems.length}` : `${localItems.length}`} entries
+              </span>
+            </div>
+          </div>
+        )}
 
       </div>
 
