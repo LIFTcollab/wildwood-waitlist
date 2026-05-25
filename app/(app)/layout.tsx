@@ -50,10 +50,10 @@ export default async function DashboardLayout({
 
       {/* ── Top nav bar ──────────────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-surface-warm border-b border-border">
-        <div className="flex items-center h-14 px-6 gap-5">
+        <div className="flex items-center h-14 px-6">
 
-          {/* Brand */}
-          <div className="flex items-center gap-2.5 flex-shrink-0">
+          {/* Brand — flex-1 so it balances the right side and centers the nav */}
+          <div className="flex-1 flex items-center gap-2.5">
             <div className="w-7 h-7 bg-green rounded-lg flex items-center justify-center flex-shrink-0">
               <svg
                 viewBox="0 0 24 24"
@@ -78,17 +78,11 @@ export default async function DashboardLayout({
             </span>
           </div>
 
-          {/* Divider */}
-          <div className="h-5 w-px bg-border flex-shrink-0" />
-
-          {/* Nav links (client component — needs usePathname) */}
+          {/* Nav links — centered because both sides are flex-1 */}
           <TopNav />
 
-          {/* Push user info to right edge */}
-          <div className="flex-1" />
-
-          {/* User info + sign out */}
-          <div className="flex items-center gap-2.5 flex-shrink-0">
+          {/* User info + sign out — flex-1 + justify-end mirrors the brand side */}
+          <div className="flex-1 flex items-center justify-end gap-2.5">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 bg-gradient-to-br from-[#a3c4ae] to-[#4a7c59]">
               {initials}
             </div>
