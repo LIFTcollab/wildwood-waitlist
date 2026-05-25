@@ -9,7 +9,7 @@ export default async function FamiliesPage() {
   const { data: families, error } = await supabase
     .from("families")
     .select(
-      "id, name, created_at, children(id, first_name, last_name), parents(id, first_name, last_name, primary_contact)"
+      "id, name, created_at, children(id, first_name, last_name, priority_status), parents(id, first_name, last_name, primary_contact)"
     )
     .order("name", { ascending: true });
 
