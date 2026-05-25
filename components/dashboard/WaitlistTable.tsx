@@ -454,7 +454,7 @@ export function WaitlistTable({
                       {String(rowNum).padStart(2, "0")}
                     </td>
                     <td className="px-3 py-2">
-                      <div className="font-serif font-medium text-text leading-tight">
+                      <div className="font-serif font-medium text-text leading-tight whitespace-nowrap">
                         {item.child_full_name}
                       </div>
                       {item.dob && (
