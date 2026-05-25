@@ -414,14 +414,14 @@ export function WaitlistTable({
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
         <table className="w-full text-[13.5px] border-collapse table-fixed">
           <colgroup>
-            <col style={{ width: "36px" }} />   {/* # */}
-            <col style={{ width: "19%" }} />    {/* Child */}
-            <col style={{ width: "9%" }} />     {/* Priority */}
-            <col style={{ width: "13%" }} />    {/* Term */}
-            <col style={{ width: "9%" }} />     {/* Status */}
-            <col style={{ width: "12%" }} />    {/* Classroom */}
-            <col style={{ width: "10%" }} />    {/* Applied */}
-            <col />                             {/* Notes — takes remaining */}
+            <col style={{ width: "36px" }} />
+            <col style={{ width: "19%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "10%" }} />
+            <col />
           </colgroup>
           <thead>
             <tr className="bg-surface-warm border-b border-border text-left">
