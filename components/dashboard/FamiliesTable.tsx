@@ -8,7 +8,7 @@ export type FamilyRow = {
   id: string;
   name: string;
   created_at: string;
-  children: { id: string; first_name: string; last_name: string; priority_status: string | null }[];
+  children: { id: string; first_name: string; last_name: string }[];
   parents:  { id: string; first_name: string; last_name: string; primary_contact: boolean }[];
 };
 
@@ -17,20 +17,8 @@ export type FamilyRow = {
 const PER_PAGE_OPTIONS = [25, 50, 100] as const;
 type PerPage = (typeof PER_PAGE_OPTIONS)[number];
 
-type SortKey = "name" | "children" | "parents" | "priority";
+type SortKey = "name" | "children" | "parents";
 type SortDir = "asc" | "desc";
-
-const PRIORITY_RANK: Record<string, number> = {
-  Board: 1, Teacher: 2, Alumni: 3, Sibling: 4, Regular: 5,
-};
-
-const PRIORITY_STYLES: Record<string, { bg: string; text: string }> = {
-  Board:   { bg: "bg-terra-soft",  text: "text-terra"      },
-  Teacher: { bg: "bg-green-soft",  text: "text-green-deep" },
-  Alumni:  { bg: "bg-gold-soft",   text: "text-gold"       },
-  Sibling: { bg: "bg-blue-soft",   text: "text-blue"       },
-  Regular: { bg: "bg-gray-soft",   text: "text-text-2"     },
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,28 +49,6 @@ function parentsText(parents: FamilyRow["parents"]): string {
   return sortedParents(parents)
     .map((p) => `${p.first_name} ${p.last_name}`.trim())
     .join(", ");
-}
-
-/** Returns the highest-ranked priority across all children in the family. */
-function familyPriority(children: FamilyRow["children"]): string | null {
-  let best: string | null = null;
-  let bestRank = 99;
-  for (const child of children) {
-    const rank = PRIORITY_RANK[child.priority_status ?? ""] ?? 99;
-    if (rank < bestRank) { bestRank = rank; best = child.priority_status; }
-  }
-  return best;
-}
-
-function PriorityPill({ value }: { value: string | null }) {
-  if (!value) return <span className="text-text-3">—</span>;
-  const s = PRIORITY_STYLES[value];
-  if (!s) return <span className="text-text-2 text-[12px]">{value}</span>;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11.5px] font-medium ${s.bg} ${s.text}`}>
-      {value}
-    </span>
-  );
 }
 
 // ─── Sortable header cell ─────────────────────────────────────────────────────
@@ -184,11 +150,6 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
       if (sortKey === "parents") {
         return (a.parents.length - b.parents.length) * dir;
       }
-      if (sortKey === "priority") {
-        const ra = PRIORITY_RANK[familyPriority(a.children) ?? ""] ?? 99;
-        const rb = PRIORITY_RANK[familyPriority(b.children) ?? ""] ?? 99;
-        return (ra - rb) * dir;
-      }
       return 0;
     });
   }, [filtered, sortKey, sortDir]);
@@ -282,9 +243,8 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
         <table className="w-full text-[13.5px] border-collapse">
           <colgroup>
             <col className="w-10" />
-            <col className="w-[22%]" />
-            <col className="w-px" />
-            <col className="w-[30%]" />
+            <col className="w-[26%]" />
+            <col className="w-[34%]" />
             <col />
           </colgroup>
           <thead>
@@ -298,14 +258,6 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
                 active={sortKey}
                 dir={sortDir}
                 onSort={handleSort}
-              />
-              <SortTh
-                label="Priority"
-                sortKey="priority"
-                active={sortKey}
-                dir={sortDir}
-                onSort={handleSort}
-                className="whitespace-nowrap"
               />
               <SortTh
                 label="Children"
@@ -327,7 +279,7 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
             {pageRows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={4}
                   className="px-4 py-14 text-center text-text-3 text-sm"
                 >
                   {hasSearch
@@ -337,10 +289,9 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
               </tr>
             ) : (
               pageRows.map((family, i) => {
-                const rowNum   = (currentPage - 1) * perPage + i + 1;
-                const kids     = childrenText(family.children);
-                const parents  = parentsText(family.parents);
-                const priority = familyPriority(family.children);
+                const rowNum = (currentPage - 1) * perPage + i + 1;
+                const kids    = childrenText(family.children);
+                const parents = parentsText(family.parents);
 
                 return (
                   <tr
@@ -354,9 +305,6 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
                       <span className="font-serif text-[14px] font-medium text-text">
                         {family.name || "—"}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <PriorityPill value={priority} />
                     </td>
                     <td className="px-4 py-3">
                       {family.children.length === 0 ? (
