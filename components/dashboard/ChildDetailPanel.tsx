@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { PriorityPill, StatusPill, formatDate } from "./WaitlistTable";
 import { updateWaitlistItem } from "@/app/actions/waitlist";
+import { createClient } from "@/lib/supabase/client";
+
+// ─── Family info type (fetched on demand) ─────────────────────────────────────
+
+type ParentInfo  = { id: string; first_name: string; last_name: string; primary_contact: boolean };
+type SiblingInfo = { id: string; first_name: string; last_name: string };
+type FamilyInfo  = { id: string; name: string; parents: ParentInfo[]; children: SiblingInfo[] };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -103,12 +110,14 @@ export function ChildDetailPanel({
   onClose: () => void;
   onSave: (updated: WaitlistItem) => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving,    setSaving]    = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [form,      setForm]      = useState<FormData>(() =>
+  const [isEditing,     setIsEditing]     = useState(false);
+  const [saving,        setSaving]        = useState(false);
+  const [saveError,     setSaveError]     = useState<string | null>(null);
+  const [form,          setForm]          = useState<FormData>(() =>
     item ? itemToForm(item) : itemToForm({} as WaitlistItem)
   );
+  const [familyInfo,    setFamilyInfo]    = useState<FamilyInfo | null>(null);
+  const [familyLoading, setFamilyLoading] = useState(false);
 
   // Reset edit state when a different item is opened
   useEffect(() => {
@@ -118,6 +127,22 @@ export function ChildDetailPanel({
     setSaving(false);
     setSaveError(null);
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch family info whenever the selected child changes
+  useEffect(() => {
+    if (!item?.child_id) { setFamilyInfo(null); return; }
+    setFamilyLoading(true);
+    const supabase = createClient();
+    supabase
+      .from("children")
+      .select("families(id, name, parents(id, first_name, last_name, primary_contact), children(id, first_name, last_name))")
+      .eq("id", item.child_id)
+      .single()
+      .then(({ data }) => {
+        setFamilyInfo((data?.families as unknown as FamilyInfo) ?? null);
+        setFamilyLoading(false);
+      });
+  }, [item?.child_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape
   useEffect(() => {
@@ -374,6 +399,78 @@ export function ChildDetailPanel({
               <p className="text-[13.5px] text-text-3 italic">No notes</p>
             )}
           </Field>
+
+          {/* ── Family section (view mode only) ──────────────────────── */}
+          {!isEditing && (
+            <>
+              <div className="border-t border-border" />
+
+              {familyLoading ? (
+                <p className="text-[12px] text-text-3 italic">Loading family…</p>
+              ) : familyInfo ? (
+                <>
+                  {/* Family name */}
+                  <Field label="Family">
+                    <p className="font-serif text-[14px] font-medium text-text">
+                      {familyInfo.name || "—"}
+                    </p>
+                  </Field>
+
+                  {/* Parents */}
+                  <Field label="Parents">
+                    {familyInfo.parents.length === 0 ? (
+                      <p className="text-[13px] text-text-3 italic">None on record</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {[...familyInfo.parents]
+                          .sort((a, b) => {
+                            if (a.primary_contact !== b.primary_contact)
+                              return a.primary_contact ? -1 : 1;
+                            return `${a.first_name} ${a.last_name}`.localeCompare(
+                              `${b.first_name} ${b.last_name}`
+                            );
+                          })
+                          .map((p) => (
+                            <div key={p.id} className="flex items-center gap-2">
+                              <span className="text-[13px] text-text-2">
+                                {p.first_name} {p.last_name}
+                              </span>
+                              {p.primary_contact && (
+                                <span className="font-mono text-[10px] text-text-3 uppercase tracking-wide">
+                                  primary
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </Field>
+
+                  {/* Siblings */}
+                  {(() => {
+                    const siblings = familyInfo.children.filter(
+                      (c) => c.id !== item?.child_id
+                    );
+                    return (
+                      <Field label="Siblings">
+                        {siblings.length === 0 ? (
+                          <p className="text-[13px] text-text-3 italic">None</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {siblings.map((s) => (
+                              <p key={s.id} className="text-[13px] text-text-2">
+                                {s.first_name} {s.last_name}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </Field>
+                    );
+                  })()}
+                </>
+              ) : null}
+            </>
+          )}
 
           {/* Save error */}
           {saveError && (
