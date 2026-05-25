@@ -60,7 +60,6 @@ export default async function DashboardPage() {
       .select(
         "task_id, task_name, task_description, task_status, child_full_name, term_name, child_priority_status, priority_rank"
       )
-      .neq("task_status", "Done")
       .order("priority_rank", { ascending: true, nullsFirst: false })
       .order("task_name", { ascending: true })
       .limit(50),
