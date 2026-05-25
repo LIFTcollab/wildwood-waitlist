@@ -123,6 +123,45 @@ export function PriorityBar({ data }: { data: NameValue[] }) {
   );
 }
 
+export function TermStatusDonut({ data, total }: { data: NameValueColor[]; total: number }) {
+  if (!data.length || total === 0) {
+    return (
+      <div className="h-[160px] flex items-center justify-center text-sm text-text-3">
+        No entries
+      </div>
+    );
+  }
+  return (
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={160}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={46}
+            outerRadius={66}
+            paddingAngle={2}
+            dataKey="value"
+            strokeWidth={0}
+          >
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip content={<ChartTooltip />} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="text-center">
+          <div className="font-serif text-[22px] font-medium text-text leading-none">{total}</div>
+          <div className="font-mono text-[9px] text-text-3 mt-0.5 uppercase tracking-[0.06em]">total</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ClassroomDonut({ data }: { data: NameValueColor[] }) {
   if (!data.length) return <EmptyChart />;
   return (
