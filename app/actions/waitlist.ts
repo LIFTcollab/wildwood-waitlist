@@ -26,6 +26,6 @@ export async function updateWaitlistItem(
     .eq("id", id);
 
   if (error) return { error: error.message };
-  revalidatePath("/dashboard/waitlist");
+  revalidatePath("/waitlist");
   return { error: null };
 }

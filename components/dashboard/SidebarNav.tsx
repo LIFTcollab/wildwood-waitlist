@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: "⊞", label: "Dashboard", exact: true },
-  { href: "/dashboard/waitlist", icon: "☰", label: "Waitlist", exact: false },
-  { href: "/dashboard/tasks", icon: "✓", label: "Tasks", exact: false },
-  { href: "/dashboard/families", icon: "♡", label: "Families", exact: false },
+  { href: "/waitlist",  icon: "☰", label: "Waitlist",  exact: false },
+  { href: "/tasks",     icon: "✓", label: "Tasks",     exact: false },
+  { href: "/families",  icon: "♡", label: "Families",  exact: false },
 ] as const;
 
 export function SidebarNav() {
