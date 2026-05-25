@@ -1,8 +1,22 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { ChildDetailPanel } from "./ChildDetailPanel";
+
+// Dynamic import keeps Recharts off the SSR bundle
+const TermStatusDonut = dynamic(
+  () => import("./Charts").then((m) => m.TermStatusDonut),
+  { ssr: false, loading: () => <div className="w-[130px] h-[130px] rounded-full bg-surface-warm animate-pulse mx-auto" /> }
+);
+
+const CHART_LEGEND = [
+  { label: "Enrolled",   key: "enrolled"   as const, color: "#4a7c59" },
+  { label: "Waitlisted", key: "waitlisted" as const, color: "#c19b3a" },
+  { label: "Declined",   key: "declined"   as const, color: "#c87856" },
+  { label: "Inactive",   key: "inactive"   as const, color: "#9b9684" },
+];
 
 // ─── Semantic color maps ─────────────────────────────────────────────────────
 
@@ -310,6 +324,22 @@ export function WaitlistTable({
     currentPage * perPage
   );
 
+  // Status counts for the chart — always reflects the active filters
+  const chartStats = useMemo(() => {
+    const s = { total: filtered.length, enrolled: 0, waitlisted: 0, declined: 0, inactive: 0 };
+    for (const item of filtered) {
+      if (item.status === "Enrolled")   s.enrolled++;
+      if (item.status === "Waitlisted") s.waitlisted++;
+      if (item.status === "Declined")   s.declined++;
+      if (item.status === "Inactive")   s.inactive++;
+    }
+    return s;
+  }, [filtered]);
+
+  const chartData = CHART_LEGEND
+    .filter((l) => chartStats[l.key] > 0)
+    .map((l) => ({ name: l.label, value: chartStats[l.key], color: l.color }));
+
   const hasFilters =
     search !== "" ||
     filterTerms.length > 0 ||
@@ -408,6 +438,30 @@ export function WaitlistTable({
               <option key={n} value={n}>{n} per page</option>
             ))}
           </select>
+        </div>
+      </div>
+
+      {/* ── Status chart ────────────────────────────────────────────── */}
+      <div className="mb-4 bg-surface border border-border rounded-[10px] p-4 flex items-center gap-6">
+        {/* Donut */}
+        <div className="w-[160px] flex-shrink-0">
+          <TermStatusDonut data={chartData} total={chartStats.total} />
+        </div>
+
+        {/* Legend */}
+        <div className="flex-1">
+          <p className="font-mono text-[10px] uppercase tracking-[0.07em] text-text-3 mb-3">
+            {hasFilters ? "Filtered view" : "All entries"}
+          </p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+            {CHART_LEGEND.map((l) => (
+              <div key={l.label} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                <span className="font-mono text-[12px] text-text font-medium">{chartStats[l.key]}</span>
+                <span className="font-mono text-[12px] text-text-3">{l.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
