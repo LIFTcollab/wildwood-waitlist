@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { WaitlistTable } from "@/components/dashboard/WaitlistTable";
 
-export const metadata = { title: "All children — Wildwood" };
+export const metadata = { title: "Waitlist — Wildwood" };
 
 export default async function ChildrenPage() {
   const supabase = await createClient();
@@ -65,7 +65,7 @@ export default async function ChildrenPage() {
       {/* Page header */}
       <div className="mb-6">
         <h1 className="font-serif text-[26px] font-medium text-text leading-tight">
-          All children
+          Full Waitlist
         </h1>
         <p className="mt-1 text-[13.5px] text-text-2">
           <span className="font-mono">{count}</span>{" "}
