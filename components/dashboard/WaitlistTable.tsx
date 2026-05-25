@@ -354,8 +354,8 @@ export function WaitlistTable({
       {/* ── Controls + bar (left) / per-page (right) ────────────────── */}
       <div className="mb-4 flex items-start gap-3">
 
-        {/* Left column: filters stacked above the bar */}
-        <div className="flex-1 min-w-0 space-y-3">
+        {/* Left column: shrinks to content width so bar matches filter row */}
+        <div className="w-fit flex flex-col gap-3">
 
           {/* Filter row */}
           <div className="flex items-center gap-2 flex-wrap">
