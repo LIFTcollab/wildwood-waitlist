@@ -193,17 +193,19 @@ function SortTh({
   active,
   dir,
   onSort,
+  className = "",
 }: {
   label: string;
   sortKey: SortKey;
   active: SortKey;
   dir: SortDir;
   onSort: (k: SortKey) => void;
+  className?: string;
 }) {
   const isActive = active === sortKey;
   return (
     <th
-      className="px-3 py-2.5 text-[10.5px] uppercase tracking-wide cursor-pointer select-none group"
+      className={`px-3 py-2.5 text-[10.5px] uppercase tracking-wide cursor-pointer select-none group ${className}`}
       onClick={() => onSort(sortKey)}
     >
       <span className={`inline-flex items-center gap-1 font-semibold transition-colors ${isActive ? "text-green-deep" : "text-text-3 group-hover:text-text-2"}`}>
@@ -415,15 +417,15 @@ export function WaitlistTable({
         <table className="w-full text-[13.5px] border-collapse">
           <thead>
             <tr className="bg-surface-warm border-b border-border text-left">
-              <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
+              <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide whitespace-nowrap w-px">
                 #
               </th>
-              <SortTh label="Child"     sortKey="child_full_name" active={sortKey} dir={sortDir} onSort={handleSort} />
-              <SortTh label="Priority"  sortKey="priority_rank"   active={sortKey} dir={sortDir} onSort={handleSort} />
-              <SortTh label="Term"      sortKey="term_name"       active={sortKey} dir={sortDir} onSort={handleSort} />
-              <SortTh label="Status"    sortKey="status"          active={sortKey} dir={sortDir} onSort={handleSort} />
-              <SortTh label="Classroom" sortKey="classroom"       active={sortKey} dir={sortDir} onSort={handleSort} />
-              <SortTh label="Applied"   sortKey="date_applied"    active={sortKey} dir={sortDir} onSort={handleSort} />
+              <SortTh label="Child"     sortKey="child_full_name" active={sortKey} dir={sortDir} onSort={handleSort} className="min-w-[160px]" />
+              <SortTh label="Priority"  sortKey="priority_rank"   active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Term"      sortKey="term_name"       active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Status"    sortKey="status"          active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Classroom" sortKey="classroom"       active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Applied"   sortKey="date_applied"    active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
               <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
                 Notes
               </th>
@@ -448,7 +450,7 @@ export function WaitlistTable({
                       isSelected ? "bg-green-soft/50" : "hover:bg-surface-hover"
                     }`}
                   >
-                    <td className="px-3 py-2 font-mono text-text-3 text-[11.5px]">
+                    <td className="px-3 py-2 font-mono text-text-3 text-[11.5px] whitespace-nowrap">
                       {String(rowNum).padStart(2, "0")}
                     </td>
                     <td className="px-3 py-2">
@@ -468,19 +470,19 @@ export function WaitlistTable({
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <PriorityPill value={item.priority_status} />
                     </td>
-                    <td className="px-3 py-2 text-text-2 text-[13px] truncate">
+                    <td className="px-3 py-2 text-text-2 text-[13px] whitespace-nowrap">
                       {item.term_name ?? "—"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <StatusPill value={item.status} />
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-2 truncate">
+                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-2 whitespace-nowrap">
                       {item.classroom ?? "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-3">
+                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-3 whitespace-nowrap">
                       {item.date_applied ? formatDate(item.date_applied) : "—"}
                     </td>
                     <td className="px-3 py-2">
