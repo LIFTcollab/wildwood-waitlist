@@ -417,15 +417,15 @@ export function WaitlistTable({
         <table className="w-full text-[13.5px] border-collapse">
           <thead>
             <tr className="bg-surface-warm border-b border-border text-left">
-              <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide whitespace-nowrap">
+              <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide whitespace-nowrap w-px">
                 #
               </th>
               <SortTh label="Child"     sortKey="child_full_name" active={sortKey} dir={sortDir} onSort={handleSort} className="w-[22%]" />
-              <SortTh label="Priority"  sortKey="priority_rank"   active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
-              <SortTh label="Term"      sortKey="term_name"       active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
-              <SortTh label="Status"    sortKey="status"          active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
-              <SortTh label="Classroom" sortKey="classroom"       active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
-              <SortTh label="Applied"   sortKey="date_applied"    active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
+              <SortTh label="Priority"  sortKey="priority_rank"   active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Term"      sortKey="term_name"       active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Status"    sortKey="status"          active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Classroom" sortKey="classroom"       active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
+              <SortTh label="Applied"   sortKey="date_applied"    active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
               <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
                 Notes
               </th>
