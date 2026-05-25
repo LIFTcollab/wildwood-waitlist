@@ -1,15 +1,8 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import dynamic from "next/dynamic";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { ChildDetailPanel } from "./ChildDetailPanel";
-
-// Dynamic import keeps Recharts off the SSR bundle
-const TermStatusDonut = dynamic(
-  () => import("./Charts").then((m) => m.TermStatusDonut),
-  { ssr: false, loading: () => <div className="w-[130px] h-[130px] rounded-full bg-surface-warm animate-pulse mx-auto" /> }
-);
 
 const CHART_LEGEND = [
   { label: "Enrolled",   key: "enrolled"   as const, color: "#4a7c59" },
@@ -441,36 +434,42 @@ export function WaitlistTable({
         </div>
       </div>
 
-      {/* ── Status chart ────────────────────────────────────────────── */}
-      <div className="mb-4 bg-surface border border-border rounded-[10px] p-4 flex items-center gap-6">
-        {/* Donut */}
-        <div className="w-[160px] flex-shrink-0">
-          <TermStatusDonut data={chartData} total={chartStats.total} />
-        </div>
+      {/* ── Stacked status bar ──────────────────────────────────────── */}
+      {chartStats.total > 0 && (
+        <div className="mb-4">
+          {/* Bar */}
+          <div className="flex h-3 rounded-full overflow-hidden">
+            {CHART_LEGEND.map((l) => {
+              const count = chartStats[l.key];
+              if (count === 0) return null;
+              const pct = (count / chartStats.total) * 100;
+              return (
+                <div
+                  key={l.key}
+                  style={{ width: `${pct}%`, background: l.color }}
+                  title={`${l.label}: ${count}`}
+                />
+              );
+            })}
+          </div>
 
-        {/* Legend */}
-        <div className="flex-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.07em] text-text-3 mb-3">
-            {hasFilters ? "Filtered view" : "All entries"}
-          </p>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+          {/* Legend */}
+          <div className="mt-2.5 flex items-center gap-5 flex-wrap">
             {CHART_LEGEND.map((l) => (
               <div key={l.label} className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                <span className="font-mono text-[12px] text-text font-medium">{chartStats[l.key]}</span>
+                <span className="font-mono text-[12px] font-medium text-text">{chartStats[l.key]}</span>
                 <span className="font-mono text-[12px] text-text-3">{l.label}</span>
               </div>
             ))}
+            <span className="ml-auto font-mono text-[11.5px] text-text-3">
+              {hasFilters
+                ? `${filtered.length} of ${localItems.length} entries`
+                : `${localItems.length} entries`}
+            </span>
           </div>
         </div>
-      </div>
-
-      {/* Result count */}
-      <div className="mb-2 font-mono text-[11.5px] text-text-3">
-        {hasFilters
-          ? `${filtered.length} of ${localItems.length} entries`
-          : `${localItems.length} entries`}
-      </div>
+      )}
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
