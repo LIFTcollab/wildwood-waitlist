@@ -92,12 +92,14 @@ export function ChildDetailPanel({
   item,
   terms,
   canEdit,
+  taskCount = 0,
   onClose,
   onSave,
 }: {
   item: WaitlistItem | null;
   terms: SchoolTerm[];
   canEdit: boolean;
+  taskCount?: number;
   onClose: () => void;
   onSave: (updated: WaitlistItem) => void;
 }) {
@@ -245,11 +247,18 @@ export function ChildDetailPanel({
                 />
               </div>
             ) : (
-              displayDob && (
-                <p className="font-mono text-[12px] text-text-3 mt-1">
-                  b.&nbsp;{formatDate(displayDob)}&nbsp;·&nbsp;{age}
-                </p>
-              )
+              <>
+                {displayDob && (
+                  <p className="font-mono text-[12px] text-text-3 mt-1">
+                    b.&nbsp;{formatDate(displayDob)}&nbsp;·&nbsp;{age}
+                  </p>
+                )}
+                {taskCount > 0 && (
+                  <span className="inline-flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded-full bg-terra-soft text-terra font-mono text-[10.5px] font-medium">
+                    ◆ {taskCount} open task{taskCount !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </>
             )}
           </div>
 

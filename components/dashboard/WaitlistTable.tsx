@@ -222,10 +222,12 @@ export function WaitlistTable({
   items: initialItems,
   terms,
   canEdit,
+  taskCounts = {},
 }: {
   items: WaitlistItem[];
   terms: SchoolTerm[];
   canEdit: boolean;
+  taskCounts?: Record<string, number>;
 }) {
   const [localItems, setLocalItems]         = useState<WaitlistItem[]>(initialItems);
   const [search, setSearch]                 = useState("");
@@ -458,6 +460,13 @@ export function WaitlistTable({
                           {formatDate(item.dob)}
                         </div>
                       )}
+                      {(taskCounts[item.id] ?? 0) > 0 && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-terra-soft text-terra font-mono text-[10px] font-medium">
+                            ◆ {taskCounts[item.id]} task{taskCounts[item.id] !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <PriorityPill value={item.priority_status} />
@@ -521,6 +530,7 @@ export function WaitlistTable({
         item={selected}
         terms={terms}
         canEdit={canEdit}
+        taskCount={selected ? (taskCounts[selected.id] ?? 0) : 0}
         onClose={() => setSelected(null)}
         onSave={handleSave}
       />

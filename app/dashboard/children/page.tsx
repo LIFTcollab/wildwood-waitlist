@@ -10,7 +10,7 @@ export default async function ChildrenPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: items, error }, { data: terms }, { data: profile }] =
+  const [{ data: items, error }, { data: terms }, { data: profile }, { data: openTaskRows }] =
     await Promise.all([
       supabase
         .from("waitlist_items_view")
@@ -30,7 +30,20 @@ export default async function ChildrenPage() {
             .eq("id", user.id)
             .single()
         : Promise.resolve({ data: null, error: null }),
+      supabase
+        .from("tasks")
+        .select("waitlist_item_id")
+        .in("status", ["To Do", "Doing"])
+        .not("waitlist_item_id", "is", null),
     ]);
+
+  // Build a count of open tasks per waitlist item id
+  const taskCounts: Record<string, number> = {};
+  for (const row of openTaskRows ?? []) {
+    if (row.waitlist_item_id) {
+      taskCounts[row.waitlist_item_id] = (taskCounts[row.waitlist_item_id] ?? 0) + 1;
+    }
+  }
 
   if (error) {
     return (
@@ -60,7 +73,7 @@ export default async function ChildrenPage() {
         </p>
       </div>
 
-      <WaitlistTable items={items ?? []} terms={terms ?? []} canEdit={canEdit} />
+      <WaitlistTable items={items ?? []} terms={terms ?? []} canEdit={canEdit} taskCounts={taskCounts} />
     </div>
   );
 }
