@@ -42,6 +42,12 @@ export function formatDate(iso: string): string {
   });
 }
 
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+export function formatMonthYear(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return `${MONTHS[m - 1]}-${y}`;
+}
+
 // ─── Multi-select filter dropdown ─────────────────────────────────────────────
 
 function MultiSelectFilter({
@@ -483,7 +489,7 @@ export function WaitlistTable({
                       {item.classroom ?? "—"}
                     </td>
                     <td className="px-3 py-2 font-mono text-[13px] text-text-2 whitespace-nowrap">
-                      {item.date_applied ? formatDate(item.date_applied) : "—"}
+                      {item.date_applied ? formatMonthYear(item.date_applied) : "—"}
                     </td>
                     <td className="px-3 py-2 max-w-0">
                       {item.notes ? (

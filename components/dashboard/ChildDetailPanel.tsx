@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
-import { PriorityPill, StatusPill, formatDate } from "./WaitlistTable";
+import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
 import { updateWaitlistItem } from "@/app/actions/waitlist";
 import { createClient } from "@/lib/supabase/client";
 
@@ -88,7 +88,7 @@ function itemToForm(item: WaitlistItem): FormData {
     status:          item.status ?? "",
     classroom:       item.classroom ?? "",
     term_id:         item.term_id ?? "",
-    date_applied:    item.date_applied ?? "",
+    date_applied:    item.date_applied ? item.date_applied.slice(0, 7) : "",
     notes:           item.notes ?? "",
   };
 }
@@ -179,7 +179,7 @@ export function ChildDetailPanel({
       status:          form.status || null,
       classroom:       form.classroom || null,
       term_id:         form.term_id,
-      date_applied:    form.date_applied || null,
+      date_applied:    form.date_applied ? form.date_applied + "-01" : null,
       notes:           form.notes || null,
     });
 
@@ -202,7 +202,7 @@ export function ChildDetailPanel({
       classroom:        form.classroom || null,
       term_id:          form.term_id,
       term_name:        termName ?? null,
-      date_applied:     form.date_applied || null,
+      date_applied:     form.date_applied ? form.date_applied + "-01" : null,
       notes:            form.notes || null,
     };
 
@@ -369,14 +369,14 @@ export function ChildDetailPanel({
           <Field label="Date applied">
             {isEditing ? (
               <input
-                type="date"
+                type="month"
                 value={form.date_applied}
                 onChange={set("date_applied")}
                 className={inputCls + " font-mono text-[12px]"}
               />
             ) : (
               <p className="font-mono text-[12.5px] text-text-2">
-                {item.date_applied ? formatDate(item.date_applied) : "—"}
+                {item.date_applied ? formatMonthYear(item.date_applied) : "—"}
               </p>
             )}
           </Field>
