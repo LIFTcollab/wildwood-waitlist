@@ -203,7 +203,7 @@ function SortTh({
   const isActive = active === sortKey;
   return (
     <th
-      className="px-4 py-3 text-[10.5px] uppercase tracking-wide cursor-pointer select-none group"
+      className="px-3 py-2.5 text-[10.5px] uppercase tracking-wide cursor-pointer select-none group"
       onClick={() => onSort(sortKey)}
     >
       <span className={`inline-flex items-center gap-1 font-semibold transition-colors ${isActive ? "text-green-deep" : "text-text-3 group-hover:text-text-2"}`}>
@@ -412,10 +412,20 @@ export function WaitlistTable({
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <table className="w-full text-[13.5px] border-collapse">
+        <table className="w-full text-[13.5px] border-collapse table-fixed">
+          <colgroup>
+            <col style={{ width: "36px" }} />   {/* # */}
+            <col style={{ width: "19%" }} />    {/* Child */}
+            <col style={{ width: "9%" }} />     {/* Priority */}
+            <col style={{ width: "13%" }} />    {/* Term */}
+            <col style={{ width: "9%" }} />     {/* Status */}
+            <col style={{ width: "12%" }} />    {/* Classroom */}
+            <col style={{ width: "10%" }} />    {/* Applied */}
+            <col />                             {/* Notes — takes remaining */}
+          </colgroup>
           <thead>
             <tr className="bg-surface-warm border-b border-border text-left">
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide w-10">
+              <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
                 #
               </th>
               <SortTh label="Child"     sortKey="child_full_name" active={sortKey} dir={sortDir} onSort={handleSort} />
@@ -424,7 +434,7 @@ export function WaitlistTable({
               <SortTh label="Status"    sortKey="status"          active={sortKey} dir={sortDir} onSort={handleSort} />
               <SortTh label="Classroom" sortKey="classroom"       active={sortKey} dir={sortDir} onSort={handleSort} />
               <SortTh label="Applied"   sortKey="date_applied"    active={sortKey} dir={sortDir} onSort={handleSort} />
-              <th className="px-4 py-3 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
+              <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
                 Notes
               </th>
             </tr>
@@ -448,10 +458,10 @@ export function WaitlistTable({
                       isSelected ? "bg-green-soft/50" : "hover:bg-surface-hover"
                     }`}
                   >
-                    <td className="px-4 py-2.5 font-mono text-text-3 text-[11.5px]">
+                    <td className="px-3 py-2 font-mono text-text-3 text-[11.5px]">
                       {String(rowNum).padStart(2, "0")}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 py-2">
                       <div className="font-serif font-medium text-text leading-tight">
                         {item.child_full_name}
                       </div>
@@ -468,22 +478,22 @@ export function WaitlistTable({
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 py-2">
                       <PriorityPill value={item.priority_status} />
                     </td>
-                    <td className="px-4 py-2.5 text-text-2 text-[13px]">
+                    <td className="px-3 py-2 text-text-2 text-[13px] truncate">
                       {item.term_name ?? "—"}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 py-2">
                       <StatusPill value={item.status} />
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-[11.5px] text-text-2">
+                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-2 truncate">
                       {item.classroom ?? "—"}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-[11.5px] text-text-3">
+                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-3">
                       {item.date_applied ? formatDate(item.date_applied) : "—"}
                     </td>
-                    <td className="px-4 py-2.5 max-w-[180px]">
+                    <td className="px-3 py-2">
                       {item.notes ? (
                         <span className="block truncate text-[12.5px] text-text-3">
                           {item.notes}
