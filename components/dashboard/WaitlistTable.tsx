@@ -473,7 +473,7 @@ export function WaitlistTable({
                     <td className="px-3 py-2 whitespace-nowrap">
                       <PriorityPill value={item.priority_status} />
                     </td>
-                    <td className="px-3 py-2 text-text-2 text-[13px] whitespace-nowrap">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       {item.term_name ?? "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
