@@ -371,7 +371,7 @@ export function WaitlistTable({
         <div className="flex items-center gap-3">
 
           {/* Left: search + filters — ref'd so bar can match this width */}
-          <div ref={controlsRef} className="flex items-center gap-2 flex-wrap flex-1">
+          <div ref={controlsRef} className="flex items-center gap-2 flex-wrap">
             {/* Search */}
             <div className="relative">
               <svg
@@ -408,7 +408,7 @@ export function WaitlistTable({
           </div>
 
           {/* Per-page selector — pinned to right edge */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
             <span className="text-[12px] text-text-3">Show</span>
             <select
               value={perPage}
