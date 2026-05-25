@@ -412,17 +412,7 @@ export function WaitlistTable({
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <table className="w-full text-[13.5px] border-collapse table-fixed">
-          <colgroup>
-            <col style={{ width: "36px" }} />
-            <col style={{ width: "19%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "13%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "10%" }} />
-            <col />
-          </colgroup>
+        <table className="w-full text-[13.5px] border-collapse">
           <thead>
             <tr className="bg-surface-warm border-b border-border text-left">
               <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide">
