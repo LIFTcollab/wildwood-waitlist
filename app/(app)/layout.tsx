@@ -1,9 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import SignOutButton from "@/components/dashboard/SignOutButton";
-import { SidebarNav } from "@/components/dashboard/SidebarNav";
-
-const TERM_CSS_VARS = ["--green", "--gold", "--terra", "--blue"] as const;
+import { TopNav } from "@/components/dashboard/TopNav";
 
 export default async function DashboardLayout({
   children,
@@ -17,17 +15,11 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: terms }] = await Promise.all([
-    supabase
-      .from("user_profiles_view")
-      .select("name, role, organization_name")
-      .eq("id", user.id)
-      .single(),
-    supabase
-      .from("school_terms")
-      .select("id, name, sort_order")
-      .order("sort_order", { ascending: true }),
-  ]);
+  const { data: profile } = await supabase
+    .from("user_profiles_view")
+    .select("name, role, organization_name")
+    .eq("id", user.id)
+    .single();
 
   if (!profile) {
     return (
@@ -54,117 +46,69 @@ export default async function DashboardLayout({
     : (user.email?.slice(0, 2).toUpperCase() ?? "?");
 
   return (
-    <div
-      className="grid min-h-screen"
-      style={{ gridTemplateColumns: "232px 1fr" }}
-    >
-      {/* Sidebar */}
-      <aside className="bg-surface-warm border-r border-border sticky top-0 h-screen flex flex-col">
-        {/* Brand */}
-        <div className="px-5 pb-5 pt-[22px] border-b border-border flex items-center gap-[11px] flex-shrink-0">
-          <div className="w-8 h-8 bg-green rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-[18px] h-[18px] text-white"
-            >
-              <path
-                d="M12 2C12 2 7 6 7 12c0 4 2.5 7 5 7s5-3 5-7c0-6-5-10-5-10z"
-                opacity="0.4"
-              />
-              <path
-                d="M12 2v20M12 8c0 0-3 1-3 4M12 8c0 0 3 1 3 4M12 14c0 0-2 1-2 3M12 14c0 0 2 1 2 3"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                fill="none"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-          <div>
-            <div className="font-serif text-[18px] font-medium leading-tight text-text tracking-[-0.01em]">
+    <div className="min-h-screen flex flex-col bg-bg">
+
+      {/* ── Top nav bar ──────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-10 bg-surface-warm border-b border-border">
+        <div className="flex items-center h-14 px-6 gap-5">
+
+          {/* Brand */}
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <div className="w-7 h-7 bg-green rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-[15px] h-[15px] text-white"
+              >
+                <path
+                  d="M12 2C12 2 7 6 7 12c0 4 2.5 7 5 7s5-3 5-7c0-6-5-10-5-10z"
+                  opacity="0.4"
+                />
+                <path
+                  d="M12 2v20M12 8c0 0-3 1-3 4M12 8c0 0 3 1 3 4M12 14c0 0-2 1-2 3M12 14c0 0 2 1 2 3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <span className="font-serif text-[17px] font-medium text-text tracking-[-0.01em]">
               Wildwood
-            </div>
-            <div className="font-serif text-[11px] italic text-text-3 mt-0.5">
-              Waitlist & enrollment
-            </div>
+            </span>
           </div>
-        </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
-          {/* Main nav */}
-          <SidebarNav />
+          {/* Divider */}
+          <div className="h-5 w-px bg-border flex-shrink-0" />
 
-          {/* Terms */}
-          {terms && terms.length > 0 && (
-            <div>
-              <div className="px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-text-3">
-                Terms
-              </div>
-              <div className="mt-1 space-y-0.5">
-                {terms.map((term, i) => (
-                  <div
-                    key={term.id}
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13.5px] text-text-2 hover:bg-[rgba(74,124,89,0.06)] hover:text-text cursor-default transition-colors"
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{
-                        background: `var(${TERM_CSS_VARS[i % TERM_CSS_VARS.length]})`,
-                      }}
-                    />
-                    <span>{term.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Nav links (client component — needs usePathname) */}
+          <TopNav />
 
-          {/* Workspace */}
-          <div>
-            <div className="px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-text-3">
-              Workspace
-            </div>
-            <div className="mt-1 space-y-0.5">
-              {[
-                { icon: "⚙", label: "Settings" },
-                { icon: "◯", label: "Staff users" },
-              ].map(({ icon, label }) => (
-                <div
-                  key={label}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13.5px] text-text-2 hover:bg-[rgba(74,124,89,0.06)] hover:text-text cursor-default transition-colors"
-                >
-                  <span className="text-[13px] text-text-3">{icon}</span>
-                  <span>{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </nav>
+          {/* Push user info to right edge */}
+          <div className="flex-1" />
 
-        {/* User card */}
-        <div className="p-3 flex-shrink-0">
-          <div className="flex items-center gap-2.5 p-3 bg-surface border border-border rounded-[9px]">
+          {/* User info + sign out */}
+          <div className="flex items-center gap-2.5 flex-shrink-0">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 bg-gradient-to-br from-[#a3c4ae] to-[#4a7c59]">
               {initials}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-text truncate leading-tight">
+            <div>
+              <div className="text-[13px] font-medium text-text leading-tight">
                 {profile.name ?? user.email}
               </div>
-              <div className="text-[11px] text-text-3 mt-0.5">
+              <div className="text-[11px] text-text-3">
                 {profile.role} · {profile.organization_name ?? "Wildwood"}
               </div>
             </div>
             <SignOutButton />
           </div>
-        </div>
-      </aside>
 
-      {/* Main */}
-      <main className="bg-bg min-w-0">{children}</main>
+        </div>
+      </header>
+
+      {/* ── Page content ─────────────────────────────────────────────── */}
+      <main className="flex-1 bg-bg">{children}</main>
+
     </div>
   );
 }
-
