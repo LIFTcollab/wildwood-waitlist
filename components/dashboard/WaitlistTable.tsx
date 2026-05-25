@@ -420,7 +420,7 @@ export function WaitlistTable({
               <th className="px-3 py-2.5 font-semibold text-text-3 text-[10.5px] uppercase tracking-wide whitespace-nowrap w-px">
                 #
               </th>
-              <SortTh label="Child"     sortKey="child_full_name" active={sortKey} dir={sortDir} onSort={handleSort} className="w-[20%]" />
+              <SortTh label="Child"     sortKey="child_full_name" active={sortKey} dir={sortDir} onSort={handleSort} className="w-[15%]" />
               <SortTh label="Priority"  sortKey="priority_rank"   active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
               <SortTh label="Term"      sortKey="term_name"       active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
               <SortTh label="Status"    sortKey="status"          active={sortKey} dir={sortDir} onSort={handleSort} className="whitespace-nowrap w-px" />
