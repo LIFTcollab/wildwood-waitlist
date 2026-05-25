@@ -473,25 +473,25 @@ export function WaitlistTable({
                     <td className="px-3 py-2 whitespace-nowrap">
                       <PriorityPill value={item.priority_status} />
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    <td className="px-3 py-2 text-[13px] text-text-2 whitespace-nowrap">
                       {item.term_name ?? "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <StatusPill value={item.status} />
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-2 whitespace-nowrap">
+                    <td className="px-3 py-2 font-mono text-[13px] text-text-2 whitespace-nowrap">
                       {item.classroom ?? "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11.5px] text-text-3 whitespace-nowrap">
+                    <td className="px-3 py-2 font-mono text-[13px] text-text-2 whitespace-nowrap">
                       {item.date_applied ? formatDate(item.date_applied) : "—"}
                     </td>
                     <td className="px-3 py-2 max-w-0">
                       {item.notes ? (
-                        <span className="block truncate text-[12.5px] text-text-3">
+                        <span className="block truncate text-[13px] text-text-2">
                           {item.notes}
                         </span>
                       ) : (
-                        <span className="text-border-strong">—</span>
+                        <span className="text-text-2">—</span>
                       )}
                     </td>
                   </tr>
