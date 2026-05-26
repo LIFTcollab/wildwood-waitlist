@@ -141,11 +141,13 @@ export function ChildDetailPanel({
   const [familyLoading, setFamilyLoading] = useState(false);
 
   // Task state
-  const [tasks,        setTasks]        = useState<TaskInfo[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(false);
-  const [newTaskName,  setNewTaskName]  = useState("");
-  const [addingTask,   setAddingTask]   = useState(false);
-  const [taskError,    setTaskError]    = useState<string | null>(null);
+  const [tasks,          setTasks]          = useState<TaskInfo[]>([]);
+  const [tasksLoading,   setTasksLoading]   = useState(false);
+  const [newTaskName,    setNewTaskName]    = useState("");
+  const [addingTask,     setAddingTask]     = useState(false);
+  const [taskError,      setTaskError]      = useState<string | null>(null);
+  const [editingTaskId,  setEditingTaskId]  = useState<string | null>(null);
+  const [editingText,    setEditingText]    = useState("");
 
   // Reset edit state when a different item is opened
   useEffect(() => {
@@ -154,6 +156,8 @@ export function ChildDetailPanel({
     setIsEditing(false);
     setSaving(false);
     setSaveError(null);
+    setEditingTaskId(null);
+    setEditingText("");
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch family info whenever the selected child changes
@@ -300,6 +304,30 @@ export function ChildDetailPanel({
       setNewTaskName("");
     }
     setAddingTask(false);
+  }
+
+  // Task inline edit handlers
+  function startTaskEdit(task: TaskInfo) {
+    setEditingTaskId(task.task_id);
+    setEditingText(task.task_description || task.task_name);
+  }
+
+  function cancelTaskEdit() {
+    setEditingTaskId(null);
+    setEditingText("");
+  }
+
+  async function saveTaskEdit(taskId: string) {
+    const trimmed = editingText.trim();
+    if (!trimmed) return;
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => t.task_id === taskId ? { ...t, task_description: trimmed } : t)
+    );
+    setEditingTaskId(null);
+    setEditingText("");
+    const supabase = createClient();
+    await supabase.from("tasks").update({ description: trimmed }).eq("id", taskId);
   }
 
   const displayName = isEditing
@@ -576,8 +604,10 @@ export function ChildDetailPanel({
 
                     {tasks.map((task) => {
                       const style = TASK_STATUS_STYLES[task.task_status] ?? TASK_STATUS_STYLES["To Do"];
+                      const isEditingThis = editingTaskId === task.task_id;
+                      const displayText = task.task_description || task.task_name;
                       return (
-                        <div key={task.task_id} className="flex items-start gap-2.5">
+                        <div key={task.task_id} className="flex items-start gap-2.5 group">
                           {/* Clickable status pill — cycles To Do → Doing → Done */}
                           <button
                             onClick={() => cycleTaskStatus(task.task_id, task.task_status)}
@@ -586,12 +616,61 @@ export function ChildDetailPanel({
                           >
                             {task.task_status}
                           </button>
-                          <div className="flex-1 min-w-0">
-                            {/* Show description if set; fall back to name for legacy tasks */}
-                            <p className="text-[13px] text-text-2 leading-snug">
-                              {task.task_description || task.task_name}
-                            </p>
-                          </div>
+
+                          {isEditingThis ? (
+                            /* ── Inline edit mode ── */
+                            <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                              <input
+                                autoFocus
+                                value={editingText}
+                                onChange={(e) => setEditingText(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter")  saveTaskEdit(task.task_id);
+                                  if (e.key === "Escape") cancelTaskEdit();
+                                }}
+                                className="flex-1 min-w-0 px-2 py-1 bg-surface border border-green rounded-md text-[12.5px] text-text focus:outline-none"
+                              />
+                              {/* Save */}
+                              <button
+                                onClick={() => saveTaskEdit(task.task_id)}
+                                disabled={!editingText.trim()}
+                                title="Save"
+                                className="flex-shrink-0 p-1 rounded text-green hover:text-green-deep disabled:opacity-40 transition-colors"
+                              >
+                                <svg viewBox="0 0 12 10" fill="none" className="w-3 h-3">
+                                  <path d="M1 5l3.5 3.5L11 1" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </button>
+                              {/* Cancel */}
+                              <button
+                                onClick={cancelTaskEdit}
+                                title="Cancel"
+                                className="flex-shrink-0 p-1 rounded text-text-3 hover:text-text transition-colors"
+                              >
+                                <svg viewBox="0 0 10 10" fill="none" className="w-2.5 h-2.5">
+                                  <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : (
+                            /* ── View mode — pencil appears on row hover ── */
+                            <div className="flex-1 flex items-center gap-1 min-w-0">
+                              <p className="flex-1 text-[13px] text-text-2 leading-snug">
+                                {displayText}
+                              </p>
+                              {canEdit && (
+                                <button
+                                  onClick={() => startTaskEdit(task)}
+                                  title="Edit task"
+                                  className="flex-shrink-0 p-1 rounded text-text-3 hover:text-text opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3">
+                                    <path d="M9.5 1.5a1.5 1.5 0 0 1 2.121 0l.879.879a1.5 1.5 0 0 1 0 2.121L5 12H2v-3L9.5 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
