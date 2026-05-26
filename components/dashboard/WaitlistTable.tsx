@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { ChildDetailPanel } from "./ChildDetailPanel";
+import { AddChildModal } from "./AddChildModal";
 
 const CHART_LEGEND = [
   { label: "Enrolled",   key: "enrolled"   as const, color: "#4a7c59" },
@@ -245,6 +246,7 @@ export function WaitlistTable({
   taskCounts?: Record<string, number>;
 }) {
   const [localItems, setLocalItems]         = useState<WaitlistItem[]>(initialItems);
+  const [modalOpen, setModalOpen]           = useState(false);
   const [search, setSearch]                 = useState("");
   const [filterTerms, setFilterTerms]       = useState<string[]>([]);
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
@@ -272,6 +274,11 @@ export function WaitlistTable({
   function handleSave(updated: WaitlistItem) {
     setLocalItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
     setSelected(updated);
+  }
+
+  function handleCreated(item: WaitlistItem) {
+    setLocalItems((prev) => [item, ...prev]);
+    setSelected(item);
   }
 
   function withPageReset(setter: (v: string[]) => void) {
@@ -407,8 +414,23 @@ export function WaitlistTable({
             )}
           </div>
 
+          {/* Right side: add button + per-page selector */}
+          <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
+
+          {canEdit && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-green hover:bg-green-deep transition-colors"
+            >
+              <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+                <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+              Add child
+            </button>
+          )}
+
           {/* Per-page selector — pinned to right edge */}
-          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-[12px] text-text-3">Show</span>
             <select
               value={perPage}
@@ -425,6 +447,8 @@ export function WaitlistTable({
               ))}
             </select>
           </div>
+
+          </div> {/* end right-side flex */}
 
         </div>
 
@@ -585,6 +609,14 @@ export function WaitlistTable({
         taskCount={selected ? (taskCounts[selected.id] ?? 0) : 0}
         onClose={() => setSelected(null)}
         onSave={handleSave}
+      />
+
+      {/* ── Add child modal ──────────────────────────────────────────────── */}
+      <AddChildModal
+        isOpen={modalOpen}
+        terms={terms}
+        onClose={() => setModalOpen(false)}
+        onCreated={handleCreated}
       />
     </div>
   );
