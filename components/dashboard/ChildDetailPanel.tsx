@@ -165,15 +165,18 @@ export function ChildDetailPanel({
     if (!item?.child_id) { setFamilyInfo(null); return; }
     setFamilyLoading(true);
     const supabase = createClient();
-    supabase
-      .from("children")
-      .select("families(id, name, parents(id, first_name, last_name, primary_contact), children(id, first_name, last_name))")
-      .eq("id", item.child_id)
-      .single()
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("children")
+          .select("families(id, name, parents(id, first_name, last_name, primary_contact), children(id, first_name, last_name))")
+          .eq("id", item.child_id)
+          .single();
         setFamilyInfo((data?.families as unknown as FamilyInfo) ?? null);
+      } finally {
         setFamilyLoading(false);
-      });
+      }
+    })();
   }, [item?.child_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch tasks whenever the selected waitlist item changes
@@ -183,15 +186,18 @@ export function ChildDetailPanel({
     setNewTaskName("");
     setTaskError(null);
     const supabase = createClient();
-    supabase
-      .from("waitlist_tasks_view")
-      .select("task_id, task_name, task_status, task_description")
-      .eq("waitlist_item_id", item.id)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("waitlist_tasks_view")
+          .select("task_id, task_name, task_status, task_description")
+          .eq("waitlist_item_id", item.id)
+          .order("created_at", { ascending: true });
         setTasks((data ?? []) as TaskInfo[]);
+      } finally {
         setTasksLoading(false);
-      });
+      }
+    })();
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape
@@ -270,16 +276,22 @@ export function ChildDetailPanel({
 
   // Cycle a task's status: To Do → Doing → Done → To Do
   async function cycleTaskStatus(taskId: string, currentStatus: string) {
+    if (!canEdit) return;
     const nextStatus = TASK_STATUS_NEXT[currentStatus] ?? "To Do";
+    const prevTasks = tasks;
     // Optimistic update
     setTasks((prev) =>
       prev.map((t) => t.task_id === taskId ? { ...t, task_status: nextStatus } : t)
     );
     const supabase = createClient();
-    await supabase
+    const { error } = await supabase
       .from("tasks")
       .update({ status: nextStatus })
       .eq("id", taskId);
+    if (error) {
+      setTasks(prevTasks);
+      setTaskError(error.message);
+    }
   }
 
   // Add a new task for this waitlist item.
@@ -320,6 +332,8 @@ export function ChildDetailPanel({
   async function saveTaskEdit(taskId: string) {
     const trimmed = editingText.trim();
     if (!trimmed) return;
+    const prevTasks = tasks;
+    const prevEditingText = editingText;
     // Optimistic update
     setTasks((prev) =>
       prev.map((t) => t.task_id === taskId ? { ...t, task_description: trimmed } : t)
@@ -327,7 +341,17 @@ export function ChildDetailPanel({
     setEditingTaskId(null);
     setEditingText("");
     const supabase = createClient();
-    await supabase.from("tasks").update({ description: trimmed }).eq("id", taskId);
+    const { error } = await supabase
+      .from("tasks")
+      .update({ description: trimmed })
+      .eq("id", taskId);
+    if (error) {
+      // Rollback — reopen the edit so the user can try again
+      setTasks(prevTasks);
+      setEditingTaskId(taskId);
+      setEditingText(prevEditingText);
+      setTaskError(error.message);
+    }
   }
 
   const displayName = isEditing
@@ -608,14 +632,22 @@ export function ChildDetailPanel({
                       const displayText = task.task_description || task.task_name;
                       return (
                         <div key={task.task_id} className="flex items-start gap-2.5 group">
-                          {/* Clickable status pill — cycles To Do → Doing → Done */}
-                          <button
-                            onClick={() => cycleTaskStatus(task.task_id, task.task_status)}
-                            title="Click to advance status"
-                            className={`mt-0.5 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium hover:opacity-70 transition-opacity ${style.bg} ${style.text}`}
-                          >
-                            {task.task_status}
-                          </button>
+                          {/* Status pill — clickable (cycles status) for editors, static for viewers */}
+                          {canEdit ? (
+                            <button
+                              onClick={() => cycleTaskStatus(task.task_id, task.task_status)}
+                              title="Click to advance status"
+                              className={`mt-0.5 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium hover:opacity-70 transition-opacity ${style.bg} ${style.text}`}
+                            >
+                              {task.task_status}
+                            </button>
+                          ) : (
+                            <span
+                              className={`mt-0.5 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium ${style.bg} ${style.text}`}
+                            >
+                              {task.task_status}
+                            </span>
+                          )}
 
                           {isEditingThis ? (
                             /* ── Inline edit mode ── */

@@ -88,11 +88,11 @@ export default async function DashboardLayout({
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 bg-gradient-to-br from-[#a3c4ae] to-[#4a7c59]">
               {initials}
             </div>
-            <div>
-              <div className="text-[13px] font-medium text-text leading-tight">
+            <div className="min-w-0">
+              <div className="text-[13px] font-medium text-text leading-tight truncate max-w-[180px]">
                 {profile.name ?? user.email}
               </div>
-              <div className="text-[11px] text-text-3">
+              <div className="text-[11px] text-text-3 truncate max-w-[180px]">
                 {profile.role} · {profile.organization_name ?? "Wildwood"}
               </div>
             </div>

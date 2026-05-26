@@ -439,7 +439,7 @@ export function WaitlistTable({
                   <div
                     key={l.key}
                     className="rounded-full"
-                    style={{ width: `${(count / chartStats.total) * 100}%`, background: l.color }}
+                    style={{ flex: count, background: l.color }}
                     title={`${l.label}: ${count}`}
                   />
                 );
