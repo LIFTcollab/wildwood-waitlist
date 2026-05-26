@@ -634,149 +634,146 @@ ALTER TABLE public.tasks          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_profiles  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rate_limit_log ENABLE ROW LEVEL SECURITY;
 
--- organizations
+-- Pattern: one FOR SELECT (all staff) + separate FOR INSERT/UPDATE/DELETE
+-- (Admins/Directors). Avoids multiple permissive SELECT policies which cause
+-- each policy to be evaluated on every query row (Supabase Advisor lint 0006).
+
+-- organizations (uses `id` not `organization_id`)
 CREATE POLICY "Any staff can view their org"
   ON public.organizations FOR SELECT TO authenticated
   USING (id = public.current_user_org());
-
-CREATE POLICY "Admins and Directors can manage their org"
-  ON public.organizations FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND id = public.current_user_org()
-  );
+CREATE POLICY "Admins and Directors can insert their org"
+  ON public.organizations FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update their org"
+  ON public.organizations FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete their org"
+  ON public.organizations FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND id = public.current_user_org());
 
 -- families
 CREATE POLICY "Any staff can view families"
   ON public.families FOR SELECT TO authenticated
   USING (organization_id = public.current_user_org());
-
-CREATE POLICY "Admins and Directors can manage families"
-  ON public.families FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  );
+CREATE POLICY "Admins and Directors can insert families"
+  ON public.families FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update families"
+  ON public.families FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete families"
+  ON public.families FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
 
 -- children
 CREATE POLICY "Any staff can view children"
   ON public.children FOR SELECT TO authenticated
   USING (organization_id = public.current_user_org());
-
-CREATE POLICY "Admins and Directors can manage children"
-  ON public.children FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  );
+CREATE POLICY "Admins and Directors can insert children"
+  ON public.children FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update children"
+  ON public.children FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete children"
+  ON public.children FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
 
 -- parents
 CREATE POLICY "Any staff can view parents"
   ON public.parents FOR SELECT TO authenticated
   USING (organization_id = public.current_user_org());
-
-CREATE POLICY "Admins and Directors can manage parents"
-  ON public.parents FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  );
+CREATE POLICY "Admins and Directors can insert parents"
+  ON public.parents FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update parents"
+  ON public.parents FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete parents"
+  ON public.parents FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
 
 -- school_terms
 CREATE POLICY "Any staff can view terms"
   ON public.school_terms FOR SELECT TO authenticated
   USING (organization_id = public.current_user_org());
-
-CREATE POLICY "Admins and Directors can manage terms"
-  ON public.school_terms FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  );
+CREATE POLICY "Admins and Directors can insert terms"
+  ON public.school_terms FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update terms"
+  ON public.school_terms FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete terms"
+  ON public.school_terms FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
 
 -- waitlist_items
 CREATE POLICY "Any staff can view waitlist items"
   ON public.waitlist_items FOR SELECT TO authenticated
   USING (organization_id = public.current_user_org());
-
-CREATE POLICY "Admins and Directors can manage waitlist items"
-  ON public.waitlist_items FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  );
+CREATE POLICY "Admins and Directors can insert waitlist items"
+  ON public.waitlist_items FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update waitlist items"
+  ON public.waitlist_items FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete waitlist items"
+  ON public.waitlist_items FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
 
 -- tasks
 CREATE POLICY "Any staff can view tasks"
   ON public.tasks FOR SELECT TO authenticated
   USING (organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can insert tasks"
+  ON public.tasks FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update tasks"
+  ON public.tasks FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete tasks"
+  ON public.tasks FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
 
-CREATE POLICY "Admins and Directors can manage tasks"
-  ON public.tasks FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  );
-
--- user_profiles
-CREATE POLICY "Users can view own profile"
-  ON public.user_profiles FOR SELECT TO authenticated
-  USING (id = auth.uid());
-
-CREATE POLICY "Admins and Directors can view profiles in org"
+-- user_profiles: consolidated to one SELECT policy covering own row OR
+-- admin/director in same org. Uses (select auth.uid()) to avoid per-row
+-- re-evaluation (Supabase Advisor lint 0003).
+CREATE POLICY "Staff can view user profiles"
   ON public.user_profiles FOR SELECT TO authenticated
   USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
+    id = (select auth.uid())
+    OR (
+      public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
+      AND organization_id = public.current_user_org()
+    )
   );
+CREATE POLICY "Admins and Directors can insert profiles in org"
+  ON public.user_profiles FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can update profiles in org"
+  ON public.user_profiles FOR UPDATE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org())
+  WITH CHECK (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
+CREATE POLICY "Admins and Directors can delete profiles in org"
+  ON public.user_profiles FOR DELETE TO authenticated
+  USING (public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum]) AND organization_id = public.current_user_org());
 
-CREATE POLICY "Admins and Directors can manage profiles in org"
-  ON public.user_profiles FOR ALL TO authenticated
-  USING (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  )
-  WITH CHECK (
-    public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-    AND organization_id = public.current_user_org()
-  );
-
--- rate_limit_log: no policies = no direct user access.
+-- rate_limit_log: no policies = no direct user access (RLS enabled, zero rows returned).
 
 
 -- =============================================================================
 -- 10. GRANTS                                    [HARDENED]
 -- =============================================================================
 
--- anon: revoked from all tables/views and all functions except check_email_exists
+-- anon: revoked from all tables/views
 REVOKE ALL ON TABLE public.organizations       FROM anon;
 REVOKE ALL ON TABLE public.families            FROM anon;
 REVOKE ALL ON TABLE public.children            FROM anon;
@@ -790,16 +787,19 @@ REVOKE ALL ON TABLE public.user_profiles_view  FROM anon;
 REVOKE ALL ON TABLE public.waitlist_items_view FROM anon;
 REVOKE ALL ON TABLE public.waitlist_tasks_view FROM anon;
 
-REVOKE EXECUTE ON FUNCTION public.get_auth_users()             FROM anon;
-REVOKE EXECUTE ON FUNCTION public.cleanup_rate_limit_log()     FROM anon;
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()            FROM anon;
-REVOKE EXECUTE ON FUNCTION public.handle_new_user()            FROM anon;
-REVOKE EXECUTE ON FUNCTION public.update_waitlist_items_view() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.fn_update_task_from_view()   FROM anon;
-REVOKE EXECUTE ON FUNCTION public.current_user_org()           FROM anon;
-REVOKE EXECUTE ON FUNCTION public.current_user_role()          FROM anon;
+-- Revoke PUBLIC execute on all internal/trigger functions so that anon and
+-- authenticated don't inherit it. (PostgreSQL grants EXECUTE to PUBLIC by
+-- default; revoking individual roles doesn't help if PUBLIC still has it.)
+REVOKE EXECUTE ON FUNCTION public.get_auth_users()             FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.cleanup_rate_limit_log()     FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()            FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user()            FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.update_waitlist_items_view() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.fn_update_task_from_view()   FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.current_user_org()           FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.current_user_role()          FROM PUBLIC;
 
--- KEPT: anon needs this for the pre-login email check
+-- KEPT for anon: pre-login email check (called before a session exists)
 GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO anon;
 
 -- authenticated: full table/view grants (RLS does the actual gating)
@@ -816,23 +816,18 @@ GRANT ALL ON TABLE public.user_profiles_view  TO authenticated;
 GRANT ALL ON TABLE public.waitlist_items_view TO authenticated;
 GRANT ALL ON TABLE public.waitlist_tasks_view TO authenticated;
 
--- [HARDENED 2026-05-13] authenticated: revoked EXECUTE on internal/trigger
--- functions that should never be callable via REST. The Supabase advisor
--- flags any SECURITY DEFINER function exposed at /rest/v1/rpc/* as a concern;
--- these are not meant to be REST endpoints.
-REVOKE EXECUTE ON FUNCTION public.handle_new_user()            FROM authenticated;
-REVOKE EXECUTE ON FUNCTION public.update_waitlist_items_view() FROM authenticated;
-REVOKE EXECUTE ON FUNCTION public.fn_update_task_from_view()   FROM authenticated;
-REVOKE EXECUTE ON FUNCTION public.cleanup_rate_limit_log()     FROM authenticated;
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()            FROM authenticated;
-
--- KEPT: authenticated must be able to execute these
--- (current_user_org/role are called by RLS policies; get_auth_users is
--- called by user_profiles_view; check_email_exists is callable post-login too)
-GRANT EXECUTE ON FUNCTION public.current_user_org()    TO authenticated;
-GRANT EXECUTE ON FUNCTION public.current_user_role()   TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_auth_users()      TO authenticated;
-GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO authenticated;
+-- Re-grant to authenticated only what the app actually needs:
+--   current_user_org/role  — called by every RLS policy expression
+--   get_auth_users         — called by user_profiles_view JOIN
+--   check_email_exists     — callable post-login (low risk, kept for consistency)
+-- The Supabase Advisor will still flag current_user_org, current_user_role,
+-- and get_auth_users as "callable via /rpc/" — these 3 warnings are
+-- irreducible without moving functions to a private schema. The functions
+-- are harmless (they return the caller's own org/role) and essential for RLS.
+GRANT EXECUTE ON FUNCTION public.current_user_org()           TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_user_role()          TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_auth_users()             TO authenticated;
+GRANT EXECUTE ON FUNCTION public.check_email_exists(text)     TO authenticated;
 
 
 -- =============================================================================
@@ -902,6 +897,25 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO authenticated;
 --             [6] check_email_exists already queries auth.users directly,
 --                 so the user_profiles_view restructure did not affect login.
 --
+-- 2026-05-26  Supabase Advisor hardening (17 warnings → 6 irreducible):
+--             [1] Revoked EXECUTE on internal/trigger functions from PUBLIC
+--                 (not just from anon/authenticated — roles inherit from PUBLIC,
+--                 so role-level revokes were ineffective).
+--             [2] Re-granted only what the app needs: current_user_org,
+--                 current_user_role, get_auth_users to authenticated;
+--                 check_email_exists to anon + authenticated.
+--             [3] Split all FOR ALL RLS policies into separate FOR INSERT,
+--                 FOR UPDATE, FOR DELETE policies (clears multiple-permissive-
+--                 SELECT advisor warnings on 7 tables).
+--             [4] Consolidated user_profiles to a single SELECT policy with
+--                 (select auth.uid()) — fixes auth_rls_initplan warning.
+--             [5] Added idx_tasks_organization_id and
+--                 idx_user_profiles_organization_id (missing FK indexes).
+--             Remaining 6 (intentional): check_email_exists anon/authenticated
+--             (login flow), current_user_org/role/get_auth_users authenticated
+--             (RLS/view deps, irreducible without private schema refactor),
+--             auth_leaked_password_protection (magic links only),
+--             rate_limit_log no-policy INFO (intentional zero-access design).
 -- 2026-05-26  Term management UI + view hardening:
 --             [1] Dropped school_term_name_enum cast from waitlist_items_view
 --                 (term_name is now plain text). Required DROP + recreate.
