@@ -154,11 +154,11 @@ CREATE TABLE public.tasks (
   legacy_id        text,
   waitlist_item_id uuid REFERENCES public.waitlist_items(id),
   organization_id  uuid REFERENCES public.organizations(id),
-  name             text,
   description      text,
   status           public.task_status_enum DEFAULT 'To Do',
   priority         public.task_priority_enum DEFAULT 'Important',
   created_at       timestamptz DEFAULT now()
+  -- name column removed 2026-05-26: derived live in waitlist_tasks_view
 );
 
 CREATE TABLE public.user_profiles (
@@ -268,13 +268,15 @@ CREATE OR REPLACE VIEW public.waitlist_items_view AS
 
 
 -- waitlist_tasks_view
+-- task_name is computed live as "<first> <last>: <term>" — never stored.
+-- Always current even if child name or term changes.
 CREATE OR REPLACE VIEW public.waitlist_tasks_view AS
   SELECT
-    t.id                                  AS task_id,
-    t.name                                AS task_name,
-    t.status                              AS task_status,
-    t.description                         AS task_description,
-    wi.id                                 AS waitlist_item_id,
+    t.id                                                      AS task_id,
+    (c.first_name || ' ' || c.last_name || ': ' || st.name)  AS task_name,
+    t.status                                                  AS task_status,
+    t.description                                             AS task_description,
+    wi.id                                                     AS waitlist_item_id,
     wi.status                             AS waitlist_status,
     wi.classroom,
     wi.date_applied,
@@ -527,45 +529,11 @@ END;
 $$;
 
 
--- fn_set_task_name()  [NEW 2026-05-26]
--- BEFORE INSERT trigger on public.tasks.
--- Automatically sets NEW.name to "<first> <last>: <term>" by looking up the
--- child and school term via NEW.waitlist_item_id.
--- Callers must NOT supply a name column — the DB owns it entirely.
--- Raises an exception if the waitlist item, child, or term cannot be found.
-CREATE OR REPLACE FUNCTION public.fn_set_task_name()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = ''
-AS $$
-DECLARE
-  v_child_name text;
-  v_term_name  text;
-BEGIN
-  SELECT
-    c.first_name || ' ' || c.last_name,
-    st.name
-  INTO v_child_name, v_term_name
-  FROM public.waitlist_items wi
-  JOIN public.children     c  ON c.id  = wi.child_id
-  JOIN public.school_terms st ON st.id = wi.term_id
-  WHERE wi.id = NEW.waitlist_item_id;
-
-  IF v_child_name IS NULL THEN
-    RAISE EXCEPTION 'fn_set_task_name: waitlist item % not found or has no child/term',
-      NEW.waitlist_item_id;
-  END IF;
-
-  NEW.name := v_child_name || ': ' || COALESCE(v_term_name, '');
-  RETURN NEW;
-END;
-$$;
-
-
 -- fn_update_task_from_view()
 -- INSTEAD OF UPDATE trigger for waitlist_tasks_view. SECURITY INVOKER so RLS
 -- applies on the caller's behalf.
+-- Note: task_name is computed in the view and is not stored; only description
+-- and status are writable.
 CREATE OR REPLACE FUNCTION public.fn_update_task_from_view()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -575,7 +543,6 @@ AS $$
 BEGIN
   UPDATE public.tasks
   SET
-    name        = NEW.task_name,
     description = NEW.task_description,
     status      = NEW.task_status
   WHERE id = NEW.task_id;
@@ -633,11 +600,6 @@ CREATE TRIGGER trg_update_waitlist_items_view
   INSTEAD OF UPDATE ON public.waitlist_items_view
   FOR EACH ROW
   EXECUTE FUNCTION public.update_waitlist_items_view();
-
-CREATE TRIGGER trg_set_task_name
-  BEFORE INSERT ON public.tasks
-  FOR EACH ROW
-  EXECUTE FUNCTION public.fn_set_task_name();
 
 CREATE TRIGGER trg_update_task_from_view
   INSTEAD OF UPDATE ON public.waitlist_tasks_view
@@ -826,7 +788,6 @@ REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()            FROM anon;
 REVOKE EXECUTE ON FUNCTION public.handle_new_user()            FROM anon;
 REVOKE EXECUTE ON FUNCTION public.update_waitlist_items_view() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.fn_update_task_from_view()   FROM anon;
-REVOKE EXECUTE ON FUNCTION public.fn_set_task_name()           FROM anon;
 REVOKE EXECUTE ON FUNCTION public.current_user_org()           FROM anon;
 REVOKE EXECUTE ON FUNCTION public.current_user_role()          FROM anon;
 
@@ -854,7 +815,6 @@ GRANT ALL ON TABLE public.waitlist_tasks_view TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.handle_new_user()            FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.update_waitlist_items_view() FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.fn_update_task_from_view()   FROM authenticated;
-REVOKE EXECUTE ON FUNCTION public.fn_set_task_name()           FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.cleanup_rate_limit_log()     FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()            FROM authenticated;
 
@@ -934,16 +894,16 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO authenticated;
 --             [6] check_email_exists already queries auth.users directly,
 --                 so the user_profiles_view restructure did not affect login.
 --
--- 2026-05-26  Task name trigger:
---             [1] Added fn_set_task_name() BEFORE INSERT trigger on tasks.
---                 Automatically sets name = "<first> <last>: <term>" via a
---                 JOIN on waitlist_items → children + school_terms.
---             [2] Back-filled all existing task rows to match the convention.
---             [3] Removed name-building logic from the createTask server action;
---                 action now reads the trigger-generated name back from
---                 waitlist_tasks_view after insert for optimistic UI updates.
---             [4] Revoked EXECUTE on fn_set_task_name from anon + authenticated
---                 (consistent with other internal trigger functions).
+-- 2026-05-26  Task name — moved from stored column to live view computation:
+--             [1] Dropped tasks.name column (was a denormalized snapshot prone
+--                 to going stale if child name or term changed).
+--             [2] Updated waitlist_tasks_view: task_name is now computed inline
+--                 as "<first> <last>: <term>" from the live JOIN data.
+--                 Always current; no triggers or backfills needed.
+--             [3] Updated fn_update_task_from_view: removed name write (column
+--                 no longer exists; task_name is read-only / view-computed).
+--             [4] createTask server action reads task_name back from the view
+--                 after insert for the optimistic UI update.
 --
 -- =============================================================================
 -- END OF SCHEMA DOCUMENT
