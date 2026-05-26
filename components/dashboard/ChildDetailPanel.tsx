@@ -278,7 +278,8 @@ export function ChildDetailPanel({
       .eq("id", taskId);
   }
 
-  // Add a new task for this waitlist item
+  // Add a new task for this waitlist item.
+  // task.name is auto-built server-side ("Child: Term"); user provides description.
   async function handleAddTask() {
     if (!newTaskName.trim() || !item) return;
     setAddingTask(true);
@@ -291,9 +292,9 @@ export function ChildDetailPanel({
         ...prev,
         {
           task_id:          result.taskId!,
-          task_name:        newTaskName.trim(),
+          task_name:        result.taskName ?? "",
           task_status:      "To Do",
-          task_description: null,
+          task_description: newTaskName.trim(),
         },
       ]);
       setNewTaskName("");
@@ -586,12 +587,10 @@ export function ChildDetailPanel({
                             {task.task_status}
                           </button>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] text-text-2 leading-snug">{task.task_name}</p>
-                            {task.task_description && (
-                              <p className="text-[11.5px] text-text-3 mt-0.5 leading-snug">
-                                {task.task_description}
-                              </p>
-                            )}
+                            {/* Show description if set; fall back to name for legacy tasks */}
+                            <p className="text-[13px] text-text-2 leading-snug">
+                              {task.task_description || task.task_name}
+                            </p>
                           </div>
                         </div>
                       );
@@ -604,7 +603,7 @@ export function ChildDetailPanel({
                         value={newTaskName}
                         onChange={(e) => setNewTaskName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") handleAddTask(); }}
-                        placeholder="Add a task…"
+                        placeholder="Describe the task…"
                         disabled={addingTask}
                         className="flex-1 px-2.5 py-1.5 bg-surface-warm border border-border rounded-lg text-[12.5px] text-text placeholder:text-text-3 focus:outline-none focus:border-green transition-colors disabled:opacity-50"
                       />

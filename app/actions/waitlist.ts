@@ -32,19 +32,23 @@ export async function updateWaitlistItem(
 
 export async function createTask(
   waitlistItemId: string,
-  name: string
-): Promise<{ error: string | null; taskId: string | null }> {
+  description: string
+): Promise<{ error: string | null; taskId: string | null; taskName: string | null }> {
   const supabase = await createClient();
 
-  // Fetch organization_id from the waitlist item (RLS ensures caller can only
-  // see items in their own org, so this is safe).
+  // Fetch context from the view — gives us organization_id, child name, and
+  // term name in one query so we can auto-build the task name.
   const { data: wi, error: wiError } = await supabase
-    .from("waitlist_items")
-    .select("organization_id")
+    .from("waitlist_items_view")
+    .select("organization_id, child_full_name, term_name")
     .eq("id", waitlistItemId)
     .single();
 
-  if (wiError || !wi) return { error: "Waitlist item not found", taskId: null };
+  if (wiError || !wi) return { error: "Waitlist item not found", taskId: null, taskName: null };
+
+  // Auto-generated name: "Child Name: Term" — useful in cross-child views
+  // like the Dashboard tasks table where context isn't otherwise visible.
+  const name = `${wi.child_full_name}: ${wi.term_name ?? ""}`.trim();
 
   const { data, error } = await supabase
     .from("tasks")
@@ -52,13 +56,14 @@ export async function createTask(
       waitlist_item_id: waitlistItemId,
       organization_id:  wi.organization_id,
       name,
+      description,
       status:   "To Do",
       priority: "Important",
     })
     .select("id")
     .single();
 
-  if (error) return { error: error.message, taskId: null };
+  if (error) return { error: error.message, taskId: null, taskName: null };
   revalidatePath("/waitlist");
-  return { error: null, taskId: data.id };
+  return { error: null, taskId: data.id, taskName: name };
 }
