@@ -37,11 +37,7 @@ const TASK_STATUS_NEXT: Record<string, string> = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUSES   = ["Enrolled", "Waitlisted", "Declined", "Inactive"] as const;
-const PRIORITIES = ["Board", "Teacher", "Alumni", "Sibling", "Regular"] as const;
 const CLASSROOMS = ["Younger Dome", "Older Dome"] as const;
-const PRIORITY_RANK: Record<string, number> = {
-  Board: 1, Teacher: 2, Alumni: 3, Sibling: 4, Regular: 5,
-};
 
 // ─── Age helper ───────────────────────────────────────────────────────────────
 
@@ -93,7 +89,6 @@ type FormData = {
   first_name: string;
   last_name: string;
   dob: string;
-  priority_status: string;
   status: string;
   classroom: string;
   term_id: string;
@@ -103,15 +98,14 @@ type FormData = {
 
 function itemToForm(item: WaitlistItem): FormData {
   return {
-    first_name:      item.first_name ?? "",
-    last_name:       item.last_name ?? "",
-    dob:             item.dob ?? "",
-    priority_status: item.priority_status ?? "",
-    status:          item.status ?? "",
-    classroom:       item.classroom ?? "",
-    term_id:         item.term_id ?? "",
-    date_applied:    item.date_applied ? item.date_applied.slice(0, 7) : "",
-    notes:           item.notes ?? "",
+    first_name:   item.first_name ?? "",
+    last_name:    item.last_name ?? "",
+    dob:          item.dob ?? "",
+    status:       item.status ?? "",
+    classroom:    item.classroom ?? "",
+    term_id:      item.term_id ?? "",
+    date_applied: item.date_applied ? item.date_applied.slice(0, 7) : "",
+    notes:        item.notes ?? "",
   };
 }
 
@@ -229,15 +223,14 @@ export function ChildDetailPanel({
     setSaveError(null);
 
     const result = await updateWaitlistItem(item.id, {
-      first_name:      form.first_name,
-      last_name:       form.last_name,
-      dob:             form.dob || null,
-      priority_status: form.priority_status || null,
-      status:          form.status || null,
-      classroom:       form.classroom || null,
-      term_id:         form.term_id,
-      date_applied:    form.date_applied ? form.date_applied + "-01" : null,
-      notes:           form.notes || null,
+      first_name:   form.first_name,
+      last_name:    form.last_name,
+      dob:          form.dob || null,
+      status:       form.status || null,
+      classroom:    form.classroom || null,
+      term_id:      form.term_id,
+      date_applied: form.date_applied ? form.date_applied + "-01" : null,
+      notes:        form.notes || null,
     });
 
     if (result.error) {
@@ -249,18 +242,19 @@ export function ChildDetailPanel({
     const termName = terms.find((t) => t.id === form.term_id)?.name ?? item.term_name;
     const updated: WaitlistItem = {
       ...item,
-      first_name:       form.first_name,
-      last_name:        form.last_name,
-      child_full_name:  `${form.first_name} ${form.last_name}`.trim(),
-      dob:              form.dob || null,
-      priority_status:  form.priority_status || null,
-      priority_rank:    PRIORITY_RANK[form.priority_status] ?? 99,
-      status:           form.status || null,
-      classroom:        form.classroom || null,
-      term_id:          form.term_id,
-      term_name:        termName ?? null,
-      date_applied:     form.date_applied ? form.date_applied + "-01" : null,
-      notes:            form.notes || null,
+      first_name:      form.first_name,
+      last_name:       form.last_name,
+      child_full_name: `${form.first_name} ${form.last_name}`.trim(),
+      dob:             form.dob || null,
+      // priority_status and priority_rank are computed by the DB — carry through unchanged
+      priority_status: item.priority_status,
+      priority_rank:   item.priority_rank,
+      status:          form.status || null,
+      classroom:       form.classroom || null,
+      term_id:         form.term_id,
+      term_name:       termName ?? null,
+      date_applied:    form.date_applied ? form.date_applied + "-01" : null,
+      notes:           form.notes || null,
     };
 
     onSave(updated);
@@ -458,16 +452,12 @@ export function ChildDetailPanel({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-          {/* Priority */}
+          {/* Priority — auto-computed from parent school_history + siblings; always read-only */}
           <Field label="Priority">
-            {isEditing ? (
-              <select value={form.priority_status} onChange={set("priority_status")} className={selectCls} style={selectStyle}>
-                <option value="">— None</option>
-                {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            ) : (
+            <div className="flex items-center gap-2">
               <PriorityPill value={item.priority_status} />
-            )}
+              <span className="text-[11px] text-text-3 italic">auto-computed</span>
+            </div>
           </Field>
 
           {/* Status + Classroom */}

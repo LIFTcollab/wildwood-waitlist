@@ -8,7 +8,6 @@ import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUSES   = ["Waitlisted", "Enrolled", "Declined", "Inactive"] as const;
-const PRIORITIES = ["Board", "Teacher", "Alumni", "Sibling", "Regular"] as const;
 const CLASSROOMS = ["Younger Dome", "Older Dome"] as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -31,12 +30,11 @@ type ChildForm = {
 };
 
 type WaitlistForm = {
-  term_id:         string;
-  priority_status: string;
-  status:          string;
-  classroom:       string;
-  date_applied:    string;
-  notes:           string;
+  term_id:      string;
+  status:       string;
+  classroom:    string;
+  date_applied: string;
+  notes:        string;
 };
 
 // ─── Shared input styles ──────────────────────────────────────────────────────
@@ -387,25 +385,14 @@ function StepWaitlist({
         </select>
       </div>
 
-      {/* Priority + Status */}
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-text-3 mb-1.5">
-            Priority
-          </label>
-          <select value={form.priority_status} onChange={set("priority_status")} className={selectCls} style={selectStyle}>
-            <option value="">— None</option>
-            {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-        <div className="flex-1">
-          <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-text-3 mb-1.5">
-            Status
-          </label>
-          <select value={form.status} onChange={set("status")} className={selectCls} style={selectStyle}>
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
+      {/* Status */}
+      <div>
+        <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-text-3 mb-1.5">
+          Status
+        </label>
+        <select value={form.status} onChange={set("status")} className={selectCls} style={selectStyle}>
+          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
       </div>
 
       {/* Classroom + Date applied */}
@@ -466,8 +453,7 @@ export function AddChildModal({
   const [family,  setFamily]  = useState<FamilyChoice>(null);
   const [child,   setChild]   = useState<ChildForm>({ first_name: "", last_name: "", dob: "" });
   const [wl,      setWl]      = useState<WaitlistForm>({
-    term_id: "", priority_status: "", status: "Waitlisted",
-    classroom: "", date_applied: "", notes: "",
+    term_id: "", status: "Waitlisted", classroom: "", date_applied: "", notes: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -478,7 +464,7 @@ export function AddChildModal({
       setStep(1);
       setFamily(null);
       setChild({ first_name: "", last_name: "", dob: "" });
-      setWl({ term_id: "", priority_status: "", status: "Waitlisted", classroom: "", date_applied: "", notes: "" });
+      setWl({ term_id: "", status: "Waitlisted", classroom: "", date_applied: "", notes: "" });
       setSubmitting(false);
       setSubmitError(null);
     }
@@ -516,17 +502,16 @@ export function AddChildModal({
     setSubmitError(null);
 
     const result = await createWaitlistEntry({
-      familyId:       family.kind === "existing" ? family.family.id : null,
-      familyName:     family.kind === "new"      ? family.name      : null,
-      firstName:      child.first_name.trim(),
-      lastName:       child.last_name.trim(),
-      dob:            child.dob || null,
-      priorityStatus: wl.priority_status || null,
-      termId:         wl.term_id,
-      status:         wl.status || "Waitlisted",
-      classroom:      wl.classroom || null,
-      dateApplied:    wl.date_applied || null,
-      notes:          wl.notes.trim() || null,
+      familyId:    family.kind === "existing" ? family.family.id : null,
+      familyName:  family.kind === "new"      ? family.name      : null,
+      firstName:   child.first_name.trim(),
+      lastName:    child.last_name.trim(),
+      dob:         child.dob || null,
+      termId:      wl.term_id,
+      status:      wl.status || "Waitlisted",
+      classroom:   wl.classroom || null,
+      dateApplied: wl.date_applied || null,
+      notes:       wl.notes.trim() || null,
     });
 
     if (result.error) {

@@ -7,7 +7,6 @@ export type WaitlistItemUpdate = {
   first_name: string;
   last_name: string;
   dob: string | null;
-  priority_status: string | null;
   status: string | null;
   classroom: string | null;
   term_id: string;

@@ -6,23 +6,20 @@ import type { WaitlistItem } from "@/lib/types/waitlist";
 
 export type CreateWaitlistEntryInput = {
   // Family — provide familyId for existing, familyName for new
-  familyId:       string | null;
-  familyName:     string | null;
+  familyId:    string | null;
+  familyName:  string | null;
 
   // Child
-  firstName:      string;
-  lastName:       string;
-  dob:            string | null; // YYYY-MM-DD
-
-  // Priority (stored on children table)
-  priorityStatus: string | null;
+  firstName:   string;
+  lastName:    string;
+  dob:         string | null; // YYYY-MM-DD
 
   // Waitlist entry
-  termId:         string;
-  status:         string;        // default "Waitlisted"
-  classroom:      string | null;
-  dateApplied:    string | null; // YYYY-MM  (stored as YYYY-MM-01)
-  notes:          string | null;
+  termId:      string;
+  status:      string;        // default "Waitlisted"
+  classroom:   string | null;
+  dateApplied: string | null; // YYYY-MM  (stored as YYYY-MM-01)
+  notes:       string | null;
 };
 
 export async function createWaitlistEntry(
@@ -67,7 +64,6 @@ export async function createWaitlistEntry(
       first_name:      input.firstName.trim(),
       last_name:       input.lastName.trim(),
       dob:             input.dob || null,
-      priority_status: input.priorityStatus || null,
       family_id:       familyId,
       organization_id: orgId,
     })
@@ -119,7 +115,7 @@ export async function createWaitlistEntry(
       first_name:      input.firstName.trim(),
       last_name:       input.lastName.trim(),
       dob:             input.dob ?? null,
-      priority_status: input.priorityStatus ?? null,
+      priority_status: null,
       priority_rank:   null,
       term_name:       null,
       term_id:         input.termId,
