@@ -3,14 +3,35 @@
 import { useEffect, useState } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
-import { updateWaitlistItem } from "@/app/actions/waitlist";
+import { updateWaitlistItem, createTask } from "@/app/actions/waitlist";
 import { createClient } from "@/lib/supabase/client";
 
-// ─── Family info type (fetched on demand) ─────────────────────────────────────
+// ─── Family info types (fetched on demand) ────────────────────────────────────
 
 type ParentInfo  = { id: string; first_name: string; last_name: string; primary_contact: boolean };
 type SiblingInfo = { id: string; first_name: string; last_name: string };
 type FamilyInfo  = { id: string; name: string; parents: ParentInfo[]; children: SiblingInfo[] };
+
+// ─── Task types (fetched on demand) ──────────────────────────────────────────
+
+type TaskInfo = {
+  task_id:          string;
+  task_name:        string;
+  task_status:      string;
+  task_description: string | null;
+};
+
+const TASK_STATUS_STYLES: Record<string, { bg: string; text: string }> = {
+  "To Do": { bg: "bg-gray-soft",  text: "text-text-2"    },
+  "Doing": { bg: "bg-gold-soft",  text: "text-gold"      },
+  "Done":  { bg: "bg-green-soft", text: "text-green-deep" },
+};
+
+const TASK_STATUS_NEXT: Record<string, string> = {
+  "To Do": "Doing",
+  "Doing": "Done",
+  "Done":  "To Do",
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -119,6 +140,13 @@ export function ChildDetailPanel({
   const [familyInfo,    setFamilyInfo]    = useState<FamilyInfo | null>(null);
   const [familyLoading, setFamilyLoading] = useState(false);
 
+  // Task state
+  const [tasks,        setTasks]        = useState<TaskInfo[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [newTaskName,  setNewTaskName]  = useState("");
+  const [addingTask,   setAddingTask]   = useState(false);
+  const [taskError,    setTaskError]    = useState<string | null>(null);
+
   // Reset edit state when a different item is opened
   useEffect(() => {
     if (!item) return;
@@ -143,6 +171,24 @@ export function ChildDetailPanel({
         setFamilyLoading(false);
       });
   }, [item?.child_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch tasks whenever the selected waitlist item changes
+  useEffect(() => {
+    if (!item?.id) { setTasks([]); return; }
+    setTasksLoading(true);
+    setNewTaskName("");
+    setTaskError(null);
+    const supabase = createClient();
+    supabase
+      .from("waitlist_tasks_view")
+      .select("task_id, task_name, task_status, task_description")
+      .eq("waitlist_item_id", item.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        setTasks((data ?? []) as TaskInfo[]);
+        setTasksLoading(false);
+      });
+  }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape
   useEffect(() => {
@@ -218,11 +264,53 @@ export function ChildDetailPanel({
     setSaveError(null);
   }
 
+  // Cycle a task's status: To Do → Doing → Done → To Do
+  async function cycleTaskStatus(taskId: string, currentStatus: string) {
+    const nextStatus = TASK_STATUS_NEXT[currentStatus] ?? "To Do";
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => t.task_id === taskId ? { ...t, task_status: nextStatus } : t)
+    );
+    const supabase = createClient();
+    await supabase
+      .from("tasks")
+      .update({ status: nextStatus })
+      .eq("id", taskId);
+  }
+
+  // Add a new task for this waitlist item
+  async function handleAddTask() {
+    if (!newTaskName.trim() || !item) return;
+    setAddingTask(true);
+    setTaskError(null);
+    const result = await createTask(item.id, newTaskName.trim());
+    if (result.error) {
+      setTaskError(result.error);
+    } else if (result.taskId) {
+      setTasks((prev) => [
+        ...prev,
+        {
+          task_id:          result.taskId!,
+          task_name:        newTaskName.trim(),
+          task_status:      "To Do",
+          task_description: null,
+        },
+      ]);
+      setNewTaskName("");
+    }
+    setAddingTask(false);
+  }
+
   const displayName = isEditing
     ? `${form.first_name} ${form.last_name}`.trim() || "—"
     : item.child_full_name;
 
   const displayDob = isEditing ? form.dob : item.dob;
+
+  // Badge count: use loaded tasks once available, fall back to prop while loading
+  const openCount = tasksLoading
+    ? taskCount
+    : tasks.filter((t) => t.task_status !== "Done").length;
 
   return (
     <>
@@ -278,9 +366,9 @@ export function ChildDetailPanel({
                     b.&nbsp;{formatDate(displayDob)}&nbsp;·&nbsp;{age}
                   </p>
                 )}
-                {taskCount > 0 && (
+                {openCount > 0 && (
                   <span className="inline-flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded-full bg-terra-soft text-terra font-mono text-[10.5px] font-medium">
-                    ◆ {taskCount} open task{taskCount !== 1 ? "s" : ""}
+                    ◆ {openCount} open task{openCount !== 1 ? "s" : ""}
                   </span>
                 )}
               </>
@@ -315,6 +403,7 @@ export function ChildDetailPanel({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
           {/* Priority */}
           <Field label="Priority">
             {isEditing ? (
@@ -400,23 +489,22 @@ export function ChildDetailPanel({
             )}
           </Field>
 
-          {/* ── Family section (view mode only) ──────────────────────── */}
+          {/* ── Family + Tasks sections (view mode only) ──────────────── */}
           {!isEditing && (
             <>
+              {/* ── Family ─────────────────────────────────────────────── */}
               <div className="border-t border-border" />
 
               {familyLoading ? (
                 <p className="text-[12px] text-text-3 italic">Loading family…</p>
               ) : familyInfo ? (
                 <>
-                  {/* Family name */}
                   <Field label="Family">
                     <p className="font-serif text-[14px] font-medium text-text">
                       {familyInfo.name || "—"}
                     </p>
                   </Field>
 
-                  {/* Parents */}
                   <Field label="Parents">
                     {familyInfo.parents.length === 0 ? (
                       <p className="text-[13px] text-text-3 italic">None on record</p>
@@ -446,7 +534,6 @@ export function ChildDetailPanel({
                     )}
                   </Field>
 
-                  {/* Siblings */}
                   {(() => {
                     const siblings = familyInfo.children.filter(
                       (c) => c.id !== item?.child_id
@@ -469,6 +556,73 @@ export function ChildDetailPanel({
                   })()}
                 </>
               ) : null}
+
+              {/* ── Tasks ──────────────────────────────────────────────── */}
+              <div className="border-t border-border" />
+
+              <div>
+                <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-3 mb-3">
+                  Tasks
+                </div>
+
+                {tasksLoading ? (
+                  <p className="text-[12px] text-text-3 italic">Loading tasks…</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {tasks.length === 0 && (
+                      <p className="text-[13px] text-text-3 italic">No tasks yet.</p>
+                    )}
+
+                    {tasks.map((task) => {
+                      const style = TASK_STATUS_STYLES[task.task_status] ?? TASK_STATUS_STYLES["To Do"];
+                      return (
+                        <div key={task.task_id} className="flex items-start gap-2.5">
+                          {/* Clickable status pill — cycles To Do → Doing → Done */}
+                          <button
+                            onClick={() => cycleTaskStatus(task.task_id, task.task_status)}
+                            title="Click to advance status"
+                            className={`mt-0.5 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium hover:opacity-70 transition-opacity ${style.bg} ${style.text}`}
+                          >
+                            {task.task_status}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] text-text-2 leading-snug">{task.task_name}</p>
+                            {task.task_description && (
+                              <p className="text-[11.5px] text-text-3 mt-0.5 leading-snug">
+                                {task.task_description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Add task input */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={newTaskName}
+                        onChange={(e) => setNewTaskName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleAddTask(); }}
+                        placeholder="Add a task…"
+                        disabled={addingTask}
+                        className="flex-1 px-2.5 py-1.5 bg-surface-warm border border-border rounded-lg text-[12.5px] text-text placeholder:text-text-3 focus:outline-none focus:border-green transition-colors disabled:opacity-50"
+                      />
+                      <button
+                        onClick={handleAddTask}
+                        disabled={!newTaskName.trim() || addingTask}
+                        className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-green hover:bg-green-deep transition-colors disabled:opacity-40 disabled:cursor-default"
+                      >
+                        {addingTask ? "…" : "Add"}
+                      </button>
+                    </div>
+
+                    {taskError && (
+                      <p className="text-[12px] text-terra">{taskError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
 

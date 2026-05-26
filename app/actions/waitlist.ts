@@ -29,3 +29,36 @@ export async function updateWaitlistItem(
   revalidatePath("/waitlist");
   return { error: null };
 }
+
+export async function createTask(
+  waitlistItemId: string,
+  name: string
+): Promise<{ error: string | null; taskId: string | null }> {
+  const supabase = await createClient();
+
+  // Fetch organization_id from the waitlist item (RLS ensures caller can only
+  // see items in their own org, so this is safe).
+  const { data: wi, error: wiError } = await supabase
+    .from("waitlist_items")
+    .select("organization_id")
+    .eq("id", waitlistItemId)
+    .single();
+
+  if (wiError || !wi) return { error: "Waitlist item not found", taskId: null };
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      waitlist_item_id: waitlistItemId,
+      organization_id:  wi.organization_id,
+      name,
+      status:   "To Do",
+      priority: "Important",
+    })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message, taskId: null };
+  revalidatePath("/waitlist");
+  return { error: null, taskId: data.id };
+}
