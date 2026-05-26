@@ -106,9 +106,31 @@ export async function createWaitlistEntry(
     .eq("id", wi.id)
     .single();
 
-  if (viewErr || !viewRow)
-    return { error: viewErr?.message ?? "Failed to load new entry", item: null };
-
   revalidatePath("/waitlist");
+
+  // If the view fetch fails after all 3 inserts succeeded, return a minimal
+  // item rather than an error — this prevents the caller from retrying and
+  // creating duplicate family/child/waitlist_item rows.
+  if (viewErr || !viewRow) {
+    const fallback: WaitlistItem = {
+      id:              wi.id as string,
+      child_id:        child.id as string,
+      child_full_name: `${input.firstName.trim()} ${input.lastName.trim()}`,
+      first_name:      input.firstName.trim(),
+      last_name:       input.lastName.trim(),
+      dob:             input.dob ?? null,
+      priority_status: input.priorityStatus ?? null,
+      priority_rank:   null,
+      term_name:       null,
+      term_id:         input.termId,
+      status:          input.status ?? "Waitlisted",
+      classroom:       input.classroom ?? null,
+      date_applied:    input.dateApplied ? `${input.dateApplied}-01` : null,
+      notes:           input.notes ?? null,
+      created_at:      new Date().toISOString(),
+    };
+    return { error: null, item: fallback };
+  }
+
   return { error: null, item: viewRow as unknown as WaitlistItem };
 }

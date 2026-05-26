@@ -277,6 +277,13 @@ export function WaitlistTable({
   }
 
   function handleCreated(item: WaitlistItem) {
+    // Clear all filters so the newly added child is guaranteed to be visible
+    setSearch("");
+    setFilterTerms([]);
+    setFilterStatuses([]);
+    setFilterPriorities([]);
+    setFilterClassrooms([]);
+    setPage(1);
     setLocalItems((prev) => [item, ...prev]);
     setSelected(item);
   }

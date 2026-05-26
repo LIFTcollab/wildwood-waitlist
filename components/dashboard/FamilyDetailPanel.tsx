@@ -293,6 +293,11 @@ export function FamilyDetailPanel({
       setConfirmKey(null);
       return;
     }
+    // Capture filtered list now, before the async state update resolves
+    const remainingParents = family
+      ? family.parents.filter((fp) => fp.id !== p.id)
+      : [];
+
     // Remove from local family + form state
     setFamily((prev) =>
       prev
@@ -304,18 +309,16 @@ export function FamilyDetailPanel({
       parents: prev.parents.filter((fp) => fp._key !== p._key),
     }));
     setConfirmKey(null);
-    // Sync table row
+    // Sync table row using the captured list (not stale `family` closure)
     if (family) {
       onUpdate(family.id, {
         name:    family.name,
-        parents: family.parents
-          .filter((fp) => fp.id !== p.id)
-          .map((fp) => ({
-            id:              fp.id,
-            first_name:      fp.first_name,
-            last_name:       fp.last_name,
-            primary_contact: fp.primary_contact,
-          })),
+        parents: remainingParents.map((fp) => ({
+          id:              fp.id,
+          first_name:      fp.first_name,
+          last_name:       fp.last_name,
+          primary_contact: fp.primary_contact,
+        })),
       });
     }
   }
@@ -333,22 +336,29 @@ export function FamilyDetailPanel({
     setSaving(true);
     setSaveError(null);
 
-    const errors: string[] = [];
-
-    // Update family name if changed
+    // Update family name if changed — fail fast so retry doesn't re-send
     if (form.name.trim() !== family.name) {
       const r = await updateFamilyName(family.id, form.name.trim());
-      if (r.error) errors.push(r.error);
+      if (r.error) {
+        setSaveError(r.error);
+        setSaving(false);
+        return;
+      }
     }
 
-    // Update existing parents in parallel
+    // Update existing parents in parallel — fail fast on any error
     const existing = form.parents.filter((p) => p.id !== null);
     const updateResults = await Promise.all(
       existing.map((p) => updateParent(p.id!, formToParentData(p)))
     );
-    updateResults.forEach((r) => { if (r.error) errors.push(r.error); });
+    const updateError = updateResults.find((r) => r.error);
+    if (updateError?.error) {
+      setSaveError(updateError.error);
+      setSaving(false);
+      return;
+    }
 
-    // Insert new parents sequentially (need returned ids)
+    // Insert new parents sequentially (need returned ids) — fail fast
     const newParentIds: Record<string, string> = {};
     for (const p of form.parents.filter((fp) => fp.id === null)) {
       const r = await addParent(
@@ -356,14 +366,12 @@ export function FamilyDetailPanel({
         family.organization_id,
         formToParentData(p)
       );
-      if (r.error) errors.push(r.error);
-      else if (r.id) newParentIds[p._key] = r.id;
-    }
-
-    if (errors.length > 0) {
-      setSaveError(errors[0]);
-      setSaving(false);
-      return;
+      if (r.error) {
+        setSaveError(r.error);
+        setSaving(false);
+        return;
+      }
+      if (r.id) newParentIds[p._key] = r.id;
     }
 
     // Build updated family detail

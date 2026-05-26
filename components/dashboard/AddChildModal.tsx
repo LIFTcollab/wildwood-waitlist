@@ -479,6 +479,7 @@ export function AddChildModal({
       setFamily(null);
       setChild({ first_name: "", last_name: "", dob: "" });
       setWl({ term_id: "", priority_status: "", status: "Waitlisted", classroom: "", date_applied: "", notes: "" });
+      setSubmitting(false);
       setSubmitError(null);
     }
   }, [isOpen]);
@@ -534,6 +535,7 @@ export function AddChildModal({
       return;
     }
 
+    setSubmitting(false);
     onCreated(result.item!);
     onClose();
   }
