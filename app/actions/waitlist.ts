@@ -36,26 +36,21 @@ export async function createTask(
 ): Promise<{ error: string | null; taskId: string | null; taskName: string | null }> {
   const supabase = await createClient();
 
-  // Fetch context from the view — gives us organization_id, child name, and
-  // term name in one query so we can auto-build the task name.
+  // Only need organization_id — task name is set automatically by the
+  // fn_set_task_name BEFORE INSERT trigger ("Child Name: Term").
   const { data: wi, error: wiError } = await supabase
     .from("waitlist_items_view")
-    .select("organization_id, child_full_name, term_name")
+    .select("organization_id")
     .eq("id", waitlistItemId)
     .single();
 
   if (wiError || !wi) return { error: "Waitlist item not found", taskId: null, taskName: null };
-
-  // Auto-generated name: "Child Name: Term" — useful in cross-child views
-  // like the Dashboard tasks table where context isn't otherwise visible.
-  const name = `${wi.child_full_name}: ${wi.term_name ?? ""}`.trim();
 
   const { data, error } = await supabase
     .from("tasks")
     .insert({
       waitlist_item_id: waitlistItemId,
       organization_id:  wi.organization_id,
-      name,
       description,
       status:   "To Do",
       priority: "Important",
@@ -64,6 +59,14 @@ export async function createTask(
     .single();
 
   if (error) return { error: error.message, taskId: null, taskName: null };
+
+  // Read back the trigger-generated name for the optimistic UI update.
+  const { data: task } = await supabase
+    .from("waitlist_tasks_view")
+    .select("task_name")
+    .eq("task_id", data.id)
+    .single();
+
   revalidatePath("/waitlist");
-  return { error: null, taskId: data.id, taskName: name };
+  return { error: null, taskId: data.id, taskName: task?.task_name ?? null };
 }

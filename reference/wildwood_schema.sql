@@ -5,7 +5,7 @@
 -- Project ID: qxpftvnxorzwmawzhcjo
 -- Region    : us-east-1
 -- Postgres  : 17.6.1.104
--- Generated : 2026-05-12 (post default-privileges opt-in)
+-- Generated : 2026-05-13 (post SECURITY DEFINER view restructure)
 --
 -- This document reflects the LIVE state of the database after all security
 -- hardening passes. Changes from the original baseline are tagged
@@ -13,15 +13,15 @@
 --
 -- Sections:
 --   1. Extensions
---   2. Default Privileges                       [NEW: opted in to new default]
+--   2. Default Privileges
 --   3. Enum Types
 --   4. Tables
 --   5. Indexes
---   6. Views                                    [HARDENED: user_profiles_view]
---   7. Functions                                [HARDENED: all SECURITY DEFINER]
+--   6. Views                          [HARDENED: user_profiles_view restructured]
+--   7. Functions                      [HARDENED: get_auth_users self-filtering]
 --   8. Triggers
---   9. Row Level Security (RLS) Policies        [HARDENED: WITH CHECK clauses]
---  10. Grants                                   [HARDENED: anon revocations]
+--   9. Row Level Security (RLS) Policies
+--  10. Grants                         [HARDENED: trigger fns no longer REST-callable]
 --  11. Scheduled Jobs
 --  12. Change Log
 -- =============================================================================
@@ -39,18 +39,14 @@
 
 
 -- =============================================================================
--- 2. DEFAULT PRIVILEGES                         [NEW: opted in 2026-05-12]
+-- 2. DEFAULT PRIVILEGES                         [opted in 2026-05-12]
 -- =============================================================================
--- This project opted in early to Supabase's new restrictive default privileges
--- (Supabase changelog #45329, Apr 28, 2026; enforced on all projects Oct 30, 2026).
+-- Project opted in early to Supabase's restrictive default privileges
+-- (changelog #45329, Apr 28, 2026; enforced on all projects Oct 30, 2026).
 --
--- Before this change: every new table in `public` was automatically reachable
--- via the Data API with full CRUD grants to anon/authenticated/service_role.
---
--- After this change: new tables in `public` have NO grants by default.
--- Each new table must include explicit GRANT statements in its migration.
---
--- The SQL applied:
+-- New tables in `public` have NO grants by default. Each new table must
+-- include explicit GRANT statements in its migration.
+
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM anon, authenticated, service_role;
 
@@ -63,84 +59,28 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 --   GRANT SELECT, INSERT, UPDATE, DELETE ON public.your_table TO authenticated;
 --   -- (RLS auto-enabled by the rls_auto_enable event trigger)
 --   CREATE POLICY ... ON public.your_table FOR ... ;
---
--- If anon access is intentionally needed (e.g. a public application form
--- writing to a dedicated table), add an explicit:
---   GRANT INSERT ON public.applications TO anon;
--- ...with an INSERT policy and tight rate limiting.
 
 
 -- =============================================================================
 -- 3. ENUM TYPES
 -- =============================================================================
 
-CREATE TYPE public.org_status_enum AS ENUM (
-  'Active',
-  'Inactive'
-);
-
-CREATE TYPE public.priority_status_enum AS ENUM (
-  'Board',
-  'Teacher',
-  'Alumni',
-  'Sibling',
-  'Regular'
-);
-
-CREATE TYPE public.school_history_enum AS ENUM (
-  'Teacher',
-  'Alumni'
-);
-
-CREATE TYPE public.school_term_name_enum AS ENUM (
-  'Fall 25-26',
-  'Fall 26-27',
-  'Fall 27-28',
-  'Fall 28-29',
-  'Fall 29-30'
-);
-
-CREATE TYPE public.term_status_enum AS ENUM (
-  'Open',
-  'Closed'
-);
-
-CREATE TYPE public.classroom_enum AS ENUM (
-  'Younger Dome',
-  'Older Dome'
-);
-
-CREATE TYPE public.waitlist_status_enum AS ENUM (
-  'Enrolled',
-  'Waitlisted',
-  'Declined',
-  'Inactive'
-);
-
-CREATE TYPE public.user_role_enum AS ENUM (
-  'Admin',
-  'Director',
-  'Viewer'
-);
-
-CREATE TYPE public.task_status_enum AS ENUM (
-  'To Do',
-  'Doing',
-  'Done'
-);
-
-CREATE TYPE public.task_priority_enum AS ENUM (
-  'Urgent',
-  'Important',
-  'Can Wait'
-);
+CREATE TYPE public.org_status_enum AS ENUM ('Active', 'Inactive');
+CREATE TYPE public.priority_status_enum AS ENUM ('Board', 'Teacher', 'Alumni', 'Sibling', 'Regular');
+CREATE TYPE public.school_history_enum AS ENUM ('Teacher', 'Alumni');
+CREATE TYPE public.school_term_name_enum AS ENUM ('Fall 25-26', 'Fall 26-27', 'Fall 27-28', 'Fall 28-29', 'Fall 29-30');
+CREATE TYPE public.term_status_enum AS ENUM ('Open', 'Closed');
+CREATE TYPE public.classroom_enum AS ENUM ('Younger Dome', 'Older Dome');
+CREATE TYPE public.waitlist_status_enum AS ENUM ('Enrolled', 'Waitlisted', 'Declined', 'Inactive');
+CREATE TYPE public.user_role_enum AS ENUM ('Admin', 'Director', 'Viewer');
+CREATE TYPE public.task_status_enum AS ENUM ('To Do', 'Doing', 'Done');
+CREATE TYPE public.task_priority_enum AS ENUM ('Urgent', 'Important', 'Can Wait');
 
 
 -- =============================================================================
 -- 4. TABLES
 -- =============================================================================
 
--- organizations
 CREATE TABLE public.organizations (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id   text,
@@ -149,7 +89,6 @@ CREATE TABLE public.organizations (
   created_at  timestamptz DEFAULT now()
 );
 
--- families
 CREATE TABLE public.families (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id       text,
@@ -158,7 +97,6 @@ CREATE TABLE public.families (
   created_at      timestamptz DEFAULT now()
 );
 
--- children
 CREATE TABLE public.children (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id       text,
@@ -172,7 +110,6 @@ CREATE TABLE public.children (
   created_at      timestamptz DEFAULT now()
 );
 
--- parents
 CREATE TABLE public.parents (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id       text,
@@ -187,7 +124,6 @@ CREATE TABLE public.parents (
   created_at      timestamptz DEFAULT now()
 );
 
--- school_terms
 CREATE TABLE public.school_terms (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id       text,
@@ -200,7 +136,6 @@ CREATE TABLE public.school_terms (
   created_at      timestamptz DEFAULT now()
 );
 
--- waitlist_items
 CREATE TABLE public.waitlist_items (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id       text,
@@ -214,7 +149,6 @@ CREATE TABLE public.waitlist_items (
   created_at      timestamptz DEFAULT now()
 );
 
--- tasks
 CREATE TABLE public.tasks (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id        text,
@@ -227,7 +161,6 @@ CREATE TABLE public.tasks (
   created_at       timestamptz DEFAULT now()
 );
 
--- user_profiles
 CREATE TABLE public.user_profiles (
   id              uuid PRIMARY KEY REFERENCES auth.users(id),
   name            text,
@@ -236,7 +169,6 @@ CREATE TABLE public.user_profiles (
   created_at      timestamptz DEFAULT now()
 );
 
--- rate_limit_log  [HARDENED]
 CREATE TABLE public.rate_limit_log (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ip_address text NOT NULL,
@@ -265,19 +197,24 @@ CREATE INDEX idx_rate_limit_log_email_hash       ON public.rate_limit_log  USING
 
 
 -- =============================================================================
--- 6. VIEWS                                      [HARDENED: user_profiles_view]
+-- 6. VIEWS                              [HARDENED: user_profiles_view restructure]
 -- =============================================================================
 
--- user_profiles_view  [HARDENED]
--- WHERE clause restricts rows: callers see only their own profile, or all
--- profiles in their org if Admin/Director.
+-- user_profiles_view  [HARDENED 2026-05-13]
+-- Restructured to eliminate the Supabase advisor's "SECURITY DEFINER VIEW"
+-- critical warning. Previous version had a complex WHERE clause filtering rows
+-- returned by a SECURITY DEFINER function — fragile and hard to audit.
 --
--- NOTE: This view's restriction depends on auth.uid() being non-NULL.
--- When called from a SECURITY DEFINER function in a context without an
--- authenticated user (e.g. from check_email_exists pre-login), the view
--- returns zero rows. For internal lookups, query auth.users + user_profiles
--- directly rather than this view.
-CREATE OR REPLACE VIEW public.user_profiles_view AS
+-- New design:
+--   - View is explicit SECURITY INVOKER (runs as the calling user)
+--   - No WHERE clause on the view itself
+--   - The underlying get_auth_users() function does its own row filtering
+--     based on auth.uid() and the caller's role
+--   - Defense in depth: filtering happens inside the function AND the view
+--     respects standard RLS on user_profiles
+CREATE VIEW public.user_profiles_view
+WITH (security_invoker = true)               -- [HARDENED] explicit invoker semantics
+AS
   SELECT
     up.id,
     up.name,
@@ -290,20 +227,13 @@ CREATE OR REPLACE VIEW public.user_profiles_view AS
     au.invited_at,
     au.confirmed_at
   FROM public.user_profiles up
-  JOIN get_auth_users() au(id, email, invited_at, confirmed_at, last_sign_in_at)
-    ON au.id = up.id
-  LEFT JOIN public.organizations o
-    ON o.id = up.organization_id
-  WHERE (
-    up.id = auth.uid()
-    OR (
-      public.current_user_role() = ANY (ARRAY['Admin'::user_role_enum, 'Director'::user_role_enum])
-      AND up.organization_id = public.current_user_org()
-    )
-  );
+  LEFT JOIN public.get_auth_users() au ON au.id = up.id
+  LEFT JOIN public.organizations o ON o.id = up.organization_id;
 
 
 -- waitlist_items_view
+-- Denormalized view of waitlist_items joined with children and school_terms.
+-- Primary data source for the staff waitlist UI.
 CREATE OR REPLACE VIEW public.waitlist_items_view AS
   SELECT
     wi.id,
@@ -380,32 +310,51 @@ CREATE OR REPLACE VIEW public.waitlist_tasks_view AS
 -- =============================================================================
 -- 7. FUNCTIONS                                  [HARDENED]
 -- =============================================================================
--- All SECURITY DEFINER functions now have explicit `SET search_path` clauses
--- to prevent search-path manipulation attacks.
+-- All SECURITY DEFINER functions have explicit `SET search_path` clauses
+-- to prevent search-path manipulation attacks. Functions that return rows
+-- now filter internally rather than relying on caller-side WHERE clauses.
 
 -- current_user_org()
+-- Returns the organization_id of the currently authenticated user.
+-- Required SECURITY DEFINER for RLS policies to function.
 CREATE OR REPLACE FUNCTION public.current_user_org()
 RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = ''                          -- [HARDENED]
+SET search_path = ''
 AS $$
   SELECT organization_id FROM public.user_profiles WHERE id = auth.uid();
 $$;
 
+
 -- current_user_role()
+-- Returns the role enum of the currently authenticated user.
+-- Required SECURITY DEFINER for RLS policies to function.
 CREATE OR REPLACE FUNCTION public.current_user_role()
 RETURNS public.user_role_enum
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = ''                          -- [HARDENED]
+SET search_path = ''
 AS $$
   SELECT role FROM public.user_profiles WHERE id = auth.uid();
 $$;
 
--- get_auth_users()
+
+-- get_auth_users()  [HARDENED 2026-05-13: now self-filtering]
+-- Exposes a safe subset of auth.users to the public schema.
+-- 
+-- Critical change: this function now does its OWN row-level filtering rather
+-- than returning all rows and relying on the consumer (user_profiles_view) to
+-- filter via WHERE clause. This eliminates the "SECURITY DEFINER VIEW" advisor
+-- warning and provides defense in depth.
+--
+-- Behavior:
+--   - Returns the caller's own row (matched on auth.uid())
+--   - If caller is Admin or Director, also returns all rows in their org
+--   - Otherwise returns only the caller's row
+--   - When called pre-authentication (auth.uid() is NULL), returns zero rows
 CREATE OR REPLACE FUNCTION public.get_auth_users()
 RETURNS TABLE (
   id              uuid,
@@ -416,26 +365,38 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = ''                          -- [HARDENED]
+STABLE
+SET search_path = ''
 AS $$
-  SELECT id, email, invited_at, confirmed_at, last_sign_in_at
-  FROM auth.users;
+  SELECT au.id, au.email, au.invited_at, au.confirmed_at, au.last_sign_in_at
+  FROM auth.users au
+  JOIN public.user_profiles up ON up.id = au.id
+  WHERE 
+    au.id = auth.uid()
+    OR (
+      public.current_user_role() = ANY (ARRAY['Admin'::public.user_role_enum, 'Director'::public.user_role_enum])
+      AND up.organization_id = public.current_user_org()
+    );
 $$;
 
+
 -- handle_new_user()
+-- Trigger function on auth.users INSERT. Creates a corresponding row in
+-- public.user_profiles with NULL role and organization — these must be set
+-- manually by an Admin/Director, preventing privilege escalation.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''                          -- [HARDENED]
+SET search_path = ''
 AS $$
 BEGIN
   INSERT INTO public.user_profiles (id, name, role, organization_id, created_at)
   VALUES (
     NEW.id,
     NEW.raw_user_meta_data->>'name',
-    NULL,
-    NULL,
+    NULL,                            -- explicit NULL prevents role injection
+    NULL,                            -- explicit NULL prevents org injection
     NOW()
   )
   ON CONFLICT (id) DO NOTHING;
@@ -443,15 +404,16 @@ BEGIN
 END;
 $$;
 
+
 -- check_email_exists(input_email text)  [HARDENED]
--- Rate-limited email existence check.
--- Queries auth.users + user_profiles DIRECTLY (not user_profiles_view —
--- the view's WHERE clause requires an authenticated session).
+-- Rate-limited email existence check used on the pre-login flow.
+-- Queries auth.users + user_profiles directly (NOT user_profiles_view, which
+-- requires an authenticated session for the get_auth_users() filtering to work).
 CREATE OR REPLACE FUNCTION public.check_email_exists(input_email text)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions          -- [HARDENED]
+SET search_path = public, extensions
 AS $$
 DECLARE
   ip_count      INT;
@@ -481,6 +443,8 @@ BEGIN
   FROM public.rate_limit_log
   WHERE email_hash = hashed_email AND created_at >= email_window;
 
+  -- Direct query — does NOT use user_profiles_view (which is now invoker-mode
+  -- and requires auth.uid() to be non-null)
   SELECT EXISTS (
     SELECT 1
     FROM auth.users au
@@ -502,7 +466,10 @@ BEGIN
 END;
 $$;
 
+
 -- cleanup_rate_limit_log()
+-- Deletes rate_limit_log entries older than 1 hour.
+-- Scheduled via pg_cron every 30 minutes.
 CREATE OR REPLACE FUNCTION public.cleanup_rate_limit_log()
 RETURNS void
 LANGUAGE plpgsql
@@ -515,12 +482,14 @@ BEGIN
 END;
 $$;
 
--- update_waitlist_items_view()  [HARDENED]
+
+-- update_waitlist_items_view()
+-- INSTEAD OF UPDATE trigger for waitlist_items_view.
 CREATE OR REPLACE FUNCTION public.update_waitlist_items_view()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''                          -- [HARDENED]
+SET search_path = ''
 AS $$
 DECLARE
   v_term_id uuid;
@@ -557,12 +526,51 @@ BEGIN
 END;
 $$;
 
--- fn_update_task_from_view()  [HARDENED]
+
+-- fn_set_task_name()  [NEW 2026-05-26]
+-- BEFORE INSERT trigger on public.tasks.
+-- Automatically sets NEW.name to "<first> <last>: <term>" by looking up the
+-- child and school term via NEW.waitlist_item_id.
+-- Callers must NOT supply a name column — the DB owns it entirely.
+-- Raises an exception if the waitlist item, child, or term cannot be found.
+CREATE OR REPLACE FUNCTION public.fn_set_task_name()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_child_name text;
+  v_term_name  text;
+BEGIN
+  SELECT
+    c.first_name || ' ' || c.last_name,
+    st.name
+  INTO v_child_name, v_term_name
+  FROM public.waitlist_items wi
+  JOIN public.children     c  ON c.id  = wi.child_id
+  JOIN public.school_terms st ON st.id = wi.term_id
+  WHERE wi.id = NEW.waitlist_item_id;
+
+  IF v_child_name IS NULL THEN
+    RAISE EXCEPTION 'fn_set_task_name: waitlist item % not found or has no child/term',
+      NEW.waitlist_item_id;
+  END IF;
+
+  NEW.name := v_child_name || ': ' || COALESCE(v_term_name, '');
+  RETURN NEW;
+END;
+$$;
+
+
+-- fn_update_task_from_view()
+-- INSTEAD OF UPDATE trigger for waitlist_tasks_view. SECURITY INVOKER so RLS
+-- applies on the caller's behalf.
 CREATE OR REPLACE FUNCTION public.fn_update_task_from_view()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = ''                          -- [HARDENED]
+SET search_path = ''
 AS $$
 BEGIN
   UPDATE public.tasks
@@ -575,9 +583,10 @@ BEGIN
 END;
 $$;
 
+
 -- rls_auto_enable()
--- Defense-in-depth complement to the new default-privileges setting:
--- defaults handle GRANT (table visibility), this handles RLS (row filtering).
+-- Event trigger function: automatically enables RLS on any new table
+-- created in the public schema.
 CREATE OR REPLACE FUNCTION public.rls_auto_enable()
 RETURNS event_trigger
 LANGUAGE plpgsql
@@ -625,6 +634,11 @@ CREATE TRIGGER trg_update_waitlist_items_view
   FOR EACH ROW
   EXECUTE FUNCTION public.update_waitlist_items_view();
 
+CREATE TRIGGER trg_set_task_name
+  BEFORE INSERT ON public.tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_set_task_name();
+
 CREATE TRIGGER trg_update_task_from_view
   INSTEAD OF UPDATE ON public.waitlist_tasks_view
   FOR EACH ROW
@@ -637,7 +651,7 @@ CREATE EVENT TRIGGER ensure_rls
 
 
 -- =============================================================================
--- 9. ROW LEVEL SECURITY                          [HARDENED: WITH CHECK clauses]
+-- 9. ROW LEVEL SECURITY
 -- =============================================================================
 
 ALTER TABLE public.organizations  ENABLE ROW LEVEL SECURITY;
@@ -791,11 +805,8 @@ CREATE POLICY "Admins and Directors can manage profiles in org"
 -- =============================================================================
 -- 10. GRANTS                                    [HARDENED]
 -- =============================================================================
--- These are the explicit grants on EXISTING tables (before opt-in to new
--- default privileges). All new tables going forward will need their own
--- explicit GRANT statements — see Section 2.
 
--- anon: revoked from all tables/views and most functions
+-- anon: revoked from all tables/views and all functions except check_email_exists
 REVOKE ALL ON TABLE public.organizations       FROM anon;
 REVOKE ALL ON TABLE public.families            FROM anon;
 REVOKE ALL ON TABLE public.children            FROM anon;
@@ -815,6 +826,7 @@ REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()            FROM anon;
 REVOKE EXECUTE ON FUNCTION public.handle_new_user()            FROM anon;
 REVOKE EXECUTE ON FUNCTION public.update_waitlist_items_view() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.fn_update_task_from_view()   FROM anon;
+REVOKE EXECUTE ON FUNCTION public.fn_set_task_name()           FROM anon;
 REVOKE EXECUTE ON FUNCTION public.current_user_org()           FROM anon;
 REVOKE EXECUTE ON FUNCTION public.current_user_role()          FROM anon;
 
@@ -834,6 +846,25 @@ GRANT ALL ON TABLE public.rate_limit_log      TO authenticated;
 GRANT ALL ON TABLE public.user_profiles_view  TO authenticated;
 GRANT ALL ON TABLE public.waitlist_items_view TO authenticated;
 GRANT ALL ON TABLE public.waitlist_tasks_view TO authenticated;
+
+-- [HARDENED 2026-05-13] authenticated: revoked EXECUTE on internal/trigger
+-- functions that should never be callable via REST. The Supabase advisor
+-- flags any SECURITY DEFINER function exposed at /rest/v1/rpc/* as a concern;
+-- these are not meant to be REST endpoints.
+REVOKE EXECUTE ON FUNCTION public.handle_new_user()            FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.update_waitlist_items_view() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.fn_update_task_from_view()   FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.fn_set_task_name()           FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.cleanup_rate_limit_log()     FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()            FROM authenticated;
+
+-- KEPT: authenticated must be able to execute these
+-- (current_user_org/role are called by RLS policies; get_auth_users is
+-- called by user_profiles_view; check_email_exists is callable post-login too)
+GRANT EXECUTE ON FUNCTION public.current_user_org()    TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_user_role()   TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_auth_users()      TO authenticated;
+GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO authenticated;
 
 
 -- =============================================================================
@@ -863,24 +894,56 @@ GRANT ALL ON TABLE public.waitlist_tasks_view TO authenticated;
 --             [6] Restricted user_profiles_view via WHERE clause.
 --             [7] Scheduled cleanup_rate_limit_log via pg_cron.
 --
--- 2026-05-12  search_path hardening pass (advisor-driven):
+-- 2026-05-12  search_path hardening pass:
 --             [1] Set explicit search_path on all SECURITY DEFINER functions.
---             [2] Updated all functions to use fully-qualified table refs.
+--             [2] All functions use fully-qualified table references.
 --             [3] Fixed pre-existing bug in check_email_exists: now queries
 --                 auth.users + user_profiles directly instead of the
 --                 restricted user_profiles_view (which always returned false
---                 pre-login because of its auth.uid()-dependent WHERE clause).
+--                 pre-login).
 --             [4] Rewrote update_waitlist_items_view to match current schema.
---             [5] Removed task_priority from fn_update_task_from_view since
---                 it's not exposed in waitlist_tasks_view.
 --
 -- 2026-05-12  Default privileges opt-in (Supabase changelog #45329):
 --             [1] Revoked default SELECT/INSERT/UPDATE/DELETE on TABLES
 --                 from anon, authenticated, service_role.
---             [2] Revoked default USAGE/SELECT on SEQUENCES from same roles.
---             [3] Effect: new tables in public schema now require explicit
---                 GRANT statements before the Data API can see them.
---             [4] Existing tables unaffected — their grants are preserved.
+--             [2] Effect: new tables in public schema now require explicit
+--                 GRANT statements.
+--
+-- 2026-05-12  Backup migration:
+--             [1] Migrated nightly Supabase backups from a self-hosted
+--                 GitHub Action workflow to Supabase Pro's built-in daily
+--                 backups. GitHub backup repo deleted, DB password rotated.
+--
+-- 2026-05-13  SECURITY DEFINER view restructure (advisor critical):
+--             [1] Eliminated the "SECURITY DEFINER VIEW" critical advisor
+--                 warning by restructuring user_profiles_view.
+--             [2] Old design: WHERE clause filtered rows returned by a
+--                 SECURITY DEFINER function (fragile, dependent on the
+--                 WHERE clause being correct).
+--             [3] New design: view is explicit SECURITY INVOKER, has no
+--                 WHERE clause; get_auth_users() now self-filters internally
+--                 returning only rows the caller is entitled to see.
+--             [4] Also caught an operator-precedence bug in the old WHERE
+--                 clause that could have caused org-isolation issues if
+--                 modified without parentheses awareness.
+--             [5] Revoked authenticated EXECUTE on trigger/internal
+--                 functions that should not be REST-callable
+--                 (handle_new_user, update_waitlist_items_view,
+--                 fn_update_task_from_view, cleanup_rate_limit_log,
+--                 rls_auto_enable).
+--             [6] check_email_exists already queries auth.users directly,
+--                 so the user_profiles_view restructure did not affect login.
+--
+-- 2026-05-26  Task name trigger:
+--             [1] Added fn_set_task_name() BEFORE INSERT trigger on tasks.
+--                 Automatically sets name = "<first> <last>: <term>" via a
+--                 JOIN on waitlist_items → children + school_terms.
+--             [2] Back-filled all existing task rows to match the convention.
+--             [3] Removed name-building logic from the createTask server action;
+--                 action now reads the trigger-generated name back from
+--                 waitlist_tasks_view after insert for optimistic UI updates.
+--             [4] Revoked EXECUTE on fn_set_task_name from anon + authenticated
+--                 (consistent with other internal trigger functions).
 --
 -- =============================================================================
 -- END OF SCHEMA DOCUMENT
