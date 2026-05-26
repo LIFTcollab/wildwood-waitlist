@@ -11,6 +11,7 @@ import {
   type ParentData,
 } from "@/app/actions/families";
 import type { FamilyRow } from "./FamiliesTable";
+import { PriorityPill } from "./WaitlistTable";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ type ParentDetail = {
   email:           string | null;
   phone:           string | null;
   primary_contact: boolean;
-  school_history:  "Teacher" | "Alumni" | null;
+  school_history:  "Board" | "Teacher" | "Alumni" | null;
 };
 
 type ChildWaitlistItem = {
@@ -40,6 +41,7 @@ type FamilyDetail = {
   id:              string;
   name:            string;
   organization_id: string;
+  priority_status: string | null;
   parents:         ParentDetail[];
   children:        ChildDetail[];
 };
@@ -118,7 +120,7 @@ function formToParentData(p: ParentForm): ParentData {
     email:           p.email.trim() || null,
     phone:           p.phone.trim() || null,
     primary_contact: p.primary_contact,
-    school_history:  (p.school_history as "Teacher" | "Alumni") || null,
+    school_history:  (p.school_history as "Board" | "Teacher" | "Alumni") || null,
   };
 }
 
@@ -170,7 +172,7 @@ export function FamilyDetailPanel({
         const { data: fam } = await supabase
           .from("families")
           .select(
-            "id, name, organization_id, " +
+            "id, name, organization_id, priority_status, " +
             "parents(id, first_name, last_name, email, phone, primary_contact, school_history), " +
             "children(id, first_name, last_name)"
           )
@@ -181,7 +183,7 @@ export function FamilyDetailPanel({
 
         // Cast to concrete type — Supabase can't infer deeply-nested select shapes
         type FamRaw = {
-          id: string; name: string; organization_id: string;
+          id: string; name: string; organization_id: string; priority_status: string | null;
           parents:  ParentDetail[];
           children: { id: string; first_name: string; last_name: string }[];
         };
@@ -209,6 +211,7 @@ export function FamilyDetailPanel({
           id:              f.id,
           name:            f.name,
           organization_id: f.organization_id,
+          priority_status: f.priority_status ?? null,
           parents: [...(f.parents ?? [])]
             .sort((a, b) => {
               if (a.primary_contact !== b.primary_contact)
@@ -489,9 +492,17 @@ export function FamilyDetailPanel({
                 className={inputCls + " font-serif text-[18px] font-medium"}
               />
             ) : (
-              <h2 className="font-serif text-[22px] font-medium text-text leading-tight truncate">
-                {family?.name ?? "—"}
-              </h2>
+              <>
+                <h2 className="font-serif text-[22px] font-medium text-text leading-tight truncate">
+                  {family?.name ?? "—"}
+                </h2>
+                {family?.priority_status && (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <PriorityPill value={family.priority_status} />
+                    <span className="text-[11px] text-text-3 italic">auto-computed</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -618,6 +629,7 @@ export function FamilyDetailPanel({
                               style={selectStyle}
                             >
                               <option value="">No school history</option>
+                              <option value="Board">Board</option>
                               <option value="Teacher">Teacher</option>
                               <option value="Alumni">Alumni</option>
                             </select>
@@ -663,7 +675,9 @@ export function FamilyDetailPanel({
                             )}
                             {p.school_history && (
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium ${
-                                p.school_history === "Teacher"
+                                p.school_history === "Board"
+                                  ? "bg-terra-soft text-terra"
+                                  : p.school_history === "Teacher"
                                   ? "bg-green-soft text-green-deep"
                                   : "bg-gold-soft text-gold"
                               }`}>

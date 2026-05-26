@@ -9,7 +9,7 @@ export type ParentData = {
   email:          string | null;
   phone:          string | null;
   primary_contact: boolean;
-  school_history: "Teacher" | "Alumni" | null;
+  school_history: "Board" | "Teacher" | "Alumni" | null;
 };
 
 export async function updateFamilyName(
