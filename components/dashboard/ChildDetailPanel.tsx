@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
 import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
 import { updateWaitlistItem, createTask } from "@/app/actions/waitlist";
@@ -553,9 +554,19 @@ export function ChildDetailPanel({
               ) : familyInfo ? (
                 <>
                   <Field label="Family">
-                    <p className="font-serif text-[14px] font-medium text-text">
-                      {familyInfo.name || "—"}
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-serif text-[14px] font-medium text-text">
+                        {familyInfo.name || "—"}
+                      </p>
+                      {canEdit && (
+                        <Link
+                          href={`/families?open=${familyInfo.id}`}
+                          className="flex-shrink-0 text-[12px] text-green hover:text-green-deep font-medium transition-colors"
+                        >
+                          Edit family →
+                        </Link>
+                      )}
+                    </div>
                   </Field>
 
                   <Field label="Parents">

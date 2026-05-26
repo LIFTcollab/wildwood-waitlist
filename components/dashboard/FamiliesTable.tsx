@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { FamilyDetailPanel } from "./FamilyDetailPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,12 +97,33 @@ function SortTh({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function FamiliesTable({ families }: { families: FamilyRow[] }) {
+export function FamiliesTable({
+  families: initialFamilies,
+  canEdit = false,
+  openFamilyId,
+}: {
+  families:     FamilyRow[];
+  canEdit?:     boolean;
+  openFamilyId?: string;
+}) {
+  const [localFamilies, setLocalFamilies] = useState<FamilyRow[]>(initialFamilies);
   const [search,   setSearch]   = useState("");
   const [page,     setPage]     = useState(1);
   const [perPage,  setPerPage]  = useState<PerPage>(25);
   const [sortKey,  setSortKey]  = useState<SortKey>("name");
   const [sortDir,  setSortDir]  = useState<SortDir>("asc");
+  const [selectedId, setSelectedId] = useState<string | null>(openFamilyId ?? null);
+
+  // Auto-open panel when navigated here with ?open=<id>
+  useEffect(() => {
+    if (openFamilyId) setSelectedId(openFamilyId);
+  }, [openFamilyId]);
+
+  function handleUpdate(id: string, updated: Pick<FamilyRow, "name" | "parents">) {
+    setLocalFamilies((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, ...updated } : f))
+    );
+  }
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -115,8 +137,8 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return families;
-    return families.filter((f) => {
+    if (!q) return localFamilies;
+    return localFamilies.filter((f) => {
       if (f.name.toLowerCase().includes(q)) return true;
       if (
         f.children.some(
@@ -136,7 +158,7 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
         return true;
       return false;
     });
-  }, [families, search]);
+  }, [localFamilies, search]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -234,8 +256,8 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
       {/* Result count */}
       <div className="mb-2 font-mono text-[11.5px] text-text-3">
         {hasSearch
-          ? `${filtered.length} of ${families.length} families`
-          : `${families.length} families`}
+          ? `${filtered.length} of ${localFamilies.length} families`
+          : `${localFamilies.length} families`}
       </div>
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
@@ -296,7 +318,10 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
                 return (
                   <tr
                     key={family.id}
-                    className="border-b border-border last:border-0 hover:bg-surface-hover transition-colors"
+                    onClick={() => setSelectedId(selectedId === family.id ? null : family.id)}
+                    className={`border-b border-border last:border-0 cursor-pointer transition-colors ${
+                      selectedId === family.id ? "bg-green-soft/50" : "hover:bg-surface-hover"
+                    }`}
                   >
                     <td className="px-4 py-3 font-mono text-text-3 text-[11.5px]">
                       {String(rowNum).padStart(2, "0")}
@@ -370,6 +395,14 @@ export function FamiliesTable({ families }: { families: FamilyRow[] }) {
           </div>
         </div>
       )}
+
+      {/* ── Detail panel ────────────────────────────────────────────────── */}
+      <FamilyDetailPanel
+        familyId={selectedId}
+        canEdit={canEdit}
+        onClose={() => setSelectedId(null)}
+        onUpdate={handleUpdate}
+      />
     </div>
   );
 }

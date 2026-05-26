@@ -1,0 +1,713 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import {
+  updateFamilyName,
+  updateParent,
+  addParent,
+  deleteParent,
+  type ParentData,
+} from "@/app/actions/families";
+import type { FamilyRow } from "./FamiliesTable";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ParentDetail = {
+  id:              string;
+  first_name:      string;
+  last_name:       string;
+  email:           string | null;
+  phone:           string | null;
+  primary_contact: boolean;
+  school_history:  "Teacher" | "Alumni" | null;
+};
+
+type ChildWaitlistItem = {
+  status:    string | null;
+  term_name: string | null;
+};
+
+type ChildDetail = {
+  id:         string;
+  first_name: string;
+  last_name:  string;
+  items:      ChildWaitlistItem[];
+};
+
+type FamilyDetail = {
+  id:              string;
+  name:            string;
+  organization_id: string;
+  parents:         ParentDetail[];
+  children:        ChildDetail[];
+};
+
+// ─── Form types ───────────────────────────────────────────────────────────────
+
+type ParentForm = {
+  _key:            string;   // stable React key (id for existing, temp for new)
+  id:              string | null; // null = new, not yet saved
+  first_name:      string;
+  last_name:       string;
+  email:           string;
+  phone:           string;
+  primary_contact: boolean;
+  school_history:  string;   // "" | "Teacher" | "Alumni"
+};
+
+type FamilyForm = {
+  name:    string;
+  parents: ParentForm[];
+};
+
+// ─── Semantic color maps ──────────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
+  Enrolled:   { bg: "bg-green-soft",  text: "text-green-deep" },
+  Waitlisted: { bg: "bg-gold-soft",   text: "text-gold"       },
+  Declined:   { bg: "bg-terra-soft",  text: "text-terra"      },
+  Inactive:   { bg: "bg-gray-soft",   text: "text-text-3"     },
+};
+
+// ─── Shared input style ───────────────────────────────────────────────────────
+
+const inputCls =
+  "w-full px-2.5 py-1.5 bg-surface border border-border rounded-lg text-[13px] text-text focus:outline-none focus:border-green transition-colors";
+
+const selectCls =
+  inputCls +
+  " appearance-none pr-7 cursor-pointer";
+
+const selectStyle = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath stroke='%239b9684' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m1 1 4 4 4-4'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat" as const,
+  backgroundPosition: "right 10px center" as const,
+};
+
+// ─── Field label ──────────────────────────────────────────────────────────────
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-3 mb-1.5">
+      {children}
+    </div>
+  );
+}
+
+// ─── Helper: form ↔ detail conversions ───────────────────────────────────────
+
+function parentToForm(p: ParentDetail): ParentForm {
+  return {
+    _key:            p.id,
+    id:              p.id,
+    first_name:      p.first_name,
+    last_name:       p.last_name,
+    email:           p.email ?? "",
+    phone:           p.phone ?? "",
+    primary_contact: p.primary_contact,
+    school_history:  p.school_history ?? "",
+  };
+}
+
+function formToParentData(p: ParentForm): ParentData {
+  return {
+    first_name:      p.first_name.trim(),
+    last_name:       p.last_name.trim(),
+    email:           p.email.trim() || null,
+    phone:           p.phone.trim() || null,
+    primary_contact: p.primary_contact,
+    school_history:  (p.school_history as "Teacher" | "Alumni") || null,
+  };
+}
+
+let _keyCounter = 0;
+function newKey() { return `new-${++_keyCounter}`; }
+
+// ─── Panel ────────────────────────────────────────────────────────────────────
+
+export function FamilyDetailPanel({
+  familyId,
+  canEdit,
+  onClose,
+  onUpdate,
+}: {
+  familyId:  string | null;
+  canEdit:   boolean;
+  onClose:   () => void;
+  onUpdate:  (id: string, updated: Pick<FamilyRow, "name" | "parents">) => void;
+}) {
+  const [family,     setFamily]     = useState<FamilyDetail | null>(null);
+  const [loading,    setLoading]    = useState(false);
+  const [isEditing,  setIsEditing]  = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [saveError,  setSaveError]  = useState<string | null>(null);
+  const [form,       setForm]       = useState<FamilyForm>({ name: "", parents: [] });
+  const [confirmKey, setConfirmKey] = useState<string | null>(null); // parent _key pending remove
+  const [removeErr,  setRemoveErr]  = useState<string | null>(null);
+
+  // Fetch full family detail whenever the panel opens
+  useEffect(() => {
+    if (!familyId) { setFamily(null); setIsEditing(false); return; }
+    setLoading(true);
+    setSaveError(null);
+    setIsEditing(false);
+    const supabase = createClient();
+
+    (async () => {
+      try {
+        // Fetch family + parents + children in one round trip
+        const { data: fam } = await supabase
+          .from("families")
+          .select(
+            "id, name, organization_id, " +
+            "parents(id, first_name, last_name, email, phone, primary_contact, school_history), " +
+            "children(id, first_name, last_name)"
+          )
+          .eq("id", familyId)
+          .single();
+
+        if (!fam) { setLoading(false); return; }
+
+        // Cast to concrete type — Supabase can't infer deeply-nested select shapes
+        type FamRaw = {
+          id: string; name: string; organization_id: string;
+          parents:  ParentDetail[];
+          children: { id: string; first_name: string; last_name: string }[];
+        };
+        const f = fam as unknown as FamRaw;
+
+        // Fetch waitlist items for all children in this family
+        const childIds = (f.children ?? []).map((c) => c.id);
+        const { data: wlRows } = childIds.length
+          ? await supabase
+              .from("waitlist_items_view")
+              .select("child_id, status, term_name")
+              .in("child_id", childIds)
+          : { data: [] };
+
+        const itemsByChild: Record<string, ChildWaitlistItem[]> = {};
+        for (const row of wlRows ?? []) {
+          if (!itemsByChild[row.child_id]) itemsByChild[row.child_id] = [];
+          itemsByChild[row.child_id].push({
+            status:    row.status,
+            term_name: row.term_name,
+          });
+        }
+
+        const detail: FamilyDetail = {
+          id:              f.id,
+          name:            f.name,
+          organization_id: f.organization_id,
+          parents: [...(f.parents ?? [])]
+            .sort((a, b) => {
+              if (a.primary_contact !== b.primary_contact)
+                return a.primary_contact ? -1 : 1;
+              return `${a.first_name} ${a.last_name}`.localeCompare(
+                `${b.first_name} ${b.last_name}`
+              );
+            }),
+          children: [...(f.children ?? [])]
+            .sort((a, b) =>
+              `${a.first_name} ${a.last_name}`.localeCompare(
+                `${b.first_name} ${b.last_name}`
+              )
+            )
+            .map((c) => ({
+              ...c,
+              items: itemsByChild[c.id] ?? [],
+            })),
+        };
+
+        setFamily(detail);
+        setForm({
+          name:    detail.name,
+          parents: detail.parents.map(parentToForm),
+        });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [familyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close on Escape
+  useEffect(() => {
+    if (!familyId) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isEditing) { setIsEditing(false); setSaveError(null); }
+        else onClose();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [familyId, isEditing, onClose]);
+
+  if (!familyId) return null;
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function setParentField(key: string, field: keyof ParentForm, value: unknown) {
+    setForm((prev) => ({
+      ...prev,
+      parents: prev.parents.map((p) =>
+        p._key === key ? { ...p, [field]: value } : p
+      ),
+    }));
+  }
+
+  function addNewParent() {
+    const k = newKey();
+    setForm((prev) => ({
+      ...prev,
+      parents: [
+        ...prev.parents,
+        {
+          _key:            k,
+          id:              null,
+          first_name:      "",
+          last_name:       "",
+          email:           "",
+          phone:           "",
+          primary_contact: false,
+          school_history:  "",
+        },
+      ],
+    }));
+  }
+
+  async function handleRemoveParent(p: ParentForm) {
+    setRemoveErr(null);
+    if (p.id === null) {
+      // New parent not yet saved — just remove from form
+      setForm((prev) => ({
+        ...prev,
+        parents: prev.parents.filter((fp) => fp._key !== p._key),
+      }));
+      setConfirmKey(null);
+      return;
+    }
+    const result = await deleteParent(p.id);
+    if (result.error) {
+      setRemoveErr(result.error);
+      setConfirmKey(null);
+      return;
+    }
+    // Remove from local family + form state
+    setFamily((prev) =>
+      prev
+        ? { ...prev, parents: prev.parents.filter((fp) => fp.id !== p.id) }
+        : prev
+    );
+    setForm((prev) => ({
+      ...prev,
+      parents: prev.parents.filter((fp) => fp._key !== p._key),
+    }));
+    setConfirmKey(null);
+    // Sync table row
+    if (family) {
+      onUpdate(family.id, {
+        name:    family.name,
+        parents: family.parents
+          .filter((fp) => fp.id !== p.id)
+          .map((fp) => ({
+            id:              fp.id,
+            first_name:      fp.first_name,
+            last_name:       fp.last_name,
+            primary_contact: fp.primary_contact,
+          })),
+      });
+    }
+  }
+
+  function handleCancel() {
+    if (!family) return;
+    setForm({ name: family.name, parents: family.parents.map(parentToForm) });
+    setIsEditing(false);
+    setSaveError(null);
+    setConfirmKey(null);
+  }
+
+  async function handleSave() {
+    if (!family) return;
+    setSaving(true);
+    setSaveError(null);
+
+    const errors: string[] = [];
+
+    // Update family name if changed
+    if (form.name.trim() !== family.name) {
+      const r = await updateFamilyName(family.id, form.name.trim());
+      if (r.error) errors.push(r.error);
+    }
+
+    // Update existing parents in parallel
+    const existing = form.parents.filter((p) => p.id !== null);
+    const updateResults = await Promise.all(
+      existing.map((p) => updateParent(p.id!, formToParentData(p)))
+    );
+    updateResults.forEach((r) => { if (r.error) errors.push(r.error); });
+
+    // Insert new parents sequentially (need returned ids)
+    const newParentIds: Record<string, string> = {};
+    for (const p of form.parents.filter((fp) => fp.id === null)) {
+      const r = await addParent(
+        family.id,
+        family.organization_id,
+        formToParentData(p)
+      );
+      if (r.error) errors.push(r.error);
+      else if (r.id) newParentIds[p._key] = r.id;
+    }
+
+    if (errors.length > 0) {
+      setSaveError(errors[0]);
+      setSaving(false);
+      return;
+    }
+
+    // Build updated family detail
+    const updatedParents: ParentDetail[] = form.parents.map((p) => ({
+      id:              p.id ?? newParentIds[p._key] ?? "",
+      first_name:      p.first_name.trim(),
+      last_name:       p.last_name.trim(),
+      email:           p.email.trim() || null,
+      phone:           p.phone.trim() || null,
+      primary_contact: p.primary_contact,
+      school_history:  (p.school_history as "Teacher" | "Alumni") || null,
+    }));
+
+    const updatedFamily: FamilyDetail = {
+      ...family,
+      name:    form.name.trim(),
+      parents: updatedParents,
+    };
+    setFamily(updatedFamily);
+    // Patch form keys with real ids for any newly inserted parents
+    setForm({
+      name:    updatedFamily.name,
+      parents: updatedParents.map(parentToForm),
+    });
+
+    // Sync the families table row
+    onUpdate(family.id, {
+      name: updatedFamily.name,
+      parents: updatedParents.map((p) => ({
+        id:              p.id,
+        first_name:      p.first_name,
+        last_name:       p.last_name,
+        primary_contact: p.primary_contact,
+      })),
+    });
+
+    setIsEditing(false);
+    setSaving(false);
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-text/10 z-40"
+        onClick={isEditing ? undefined : onClose}
+        aria-hidden="true"
+      />
+
+      {/* Panel */}
+      <div
+        role="dialog"
+        aria-label={family ? `Details for ${family.name}` : "Family details"}
+        className="fixed right-0 top-0 h-full w-[440px] bg-surface border-l border-border z-50 shadow-2xl flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-5 border-b border-border flex-shrink-0">
+          <div className="min-w-0 flex-1">
+            {loading ? (
+              <div className="h-7 w-40 bg-border rounded animate-pulse" />
+            ) : isEditing ? (
+              <input
+                value={form.name}
+                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Family name"
+                className={inputCls + " font-serif text-[18px] font-medium"}
+              />
+            ) : (
+              <h2 className="font-serif text-[22px] font-medium text-text leading-tight truncate">
+                {family?.name ?? "—"}
+              </h2>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+            {canEdit && !isEditing && !loading && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              onClick={isEditing ? handleCancel : onClose}
+              aria-label={isEditing ? "Cancel edit" : "Close panel"}
+              className="p-1.5 rounded-lg text-text-3 hover:text-text hover:bg-surface-hover transition-colors"
+            >
+              <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5">
+                <path
+                  d="M1 1l12 12M13 1L1 13"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {loading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-10 bg-border/40 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* ── Parents ─────────────────────────────────────────────── */}
+              <div>
+                <FieldLabel>Parents</FieldLabel>
+
+                {removeErr && (
+                  <p className="mb-2 text-[12px] text-terra">{removeErr}</p>
+                )}
+
+                <div className="space-y-4">
+                  {(isEditing ? form.parents : family?.parents ?? []).length === 0 && (
+                    <p className="text-[13px] text-text-3 italic">No parents on record.</p>
+                  )}
+
+                  {isEditing
+                    ? form.parents.map((p) => (
+                        <div key={p._key} className="rounded-xl border border-border p-4 space-y-2.5 bg-surface-warm">
+                          {/* Name row */}
+                          <div className="flex gap-2">
+                            <input
+                              value={p.first_name}
+                              onChange={(e) => setParentField(p._key, "first_name", e.target.value)}
+                              placeholder="First name"
+                              className={inputCls}
+                            />
+                            <input
+                              value={p.last_name}
+                              onChange={(e) => setParentField(p._key, "last_name", e.target.value)}
+                              placeholder="Last name"
+                              className={inputCls}
+                            />
+                          </div>
+
+                          {/* Email */}
+                          <input
+                            type="email"
+                            value={p.email}
+                            onChange={(e) => setParentField(p._key, "email", e.target.value)}
+                            placeholder="Email"
+                            className={inputCls}
+                          />
+
+                          {/* Phone */}
+                          <input
+                            type="tel"
+                            value={p.phone}
+                            onChange={(e) => setParentField(p._key, "phone", e.target.value)}
+                            placeholder="Phone"
+                            className={inputCls}
+                          />
+
+                          {/* Bottom row: primary contact + school history + remove */}
+                          <div className="flex items-center gap-3 pt-0.5">
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <div
+                                className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+                                  p.primary_contact
+                                    ? "bg-green border-green"
+                                    : "border-border-strong bg-surface"
+                                }`}
+                                onClick={() =>
+                                  setParentField(p._key, "primary_contact", !p.primary_contact)
+                                }
+                              >
+                                {p.primary_contact && (
+                                  <svg viewBox="0 0 10 8" fill="none" className="w-2 h-2">
+                                    <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </div>
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={p.primary_contact}
+                                onChange={() =>
+                                  setParentField(p._key, "primary_contact", !p.primary_contact)
+                                }
+                              />
+                              <span className="text-[12px] text-text-2">Primary contact</span>
+                            </label>
+
+                            <select
+                              value={p.school_history}
+                              onChange={(e) => setParentField(p._key, "school_history", e.target.value)}
+                              className="flex-1 px-2.5 py-1.5 bg-surface border border-border rounded-lg text-[12.5px] text-text focus:outline-none focus:border-green transition-colors appearance-none cursor-pointer pr-6"
+                              style={selectStyle}
+                            >
+                              <option value="">No school history</option>
+                              <option value="Teacher">Teacher</option>
+                              <option value="Alumni">Alumni</option>
+                            </select>
+
+                            {/* Remove / confirm */}
+                            {confirmKey === p._key ? (
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-[12px] text-text-2">Remove?</span>
+                                <button
+                                  onClick={() => handleRemoveParent(p)}
+                                  className="text-[12px] text-terra font-medium hover:underline"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  onClick={() => setConfirmKey(null)}
+                                  className="text-[12px] text-text-3 hover:underline"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmKey(p._key)}
+                                className="flex-shrink-0 text-[12px] text-text-3 hover:text-terra transition-colors"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    : family?.parents.map((p) => (
+                        <div key={p.id} className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-serif text-[14px] font-medium text-text">
+                              {p.first_name} {p.last_name}
+                            </span>
+                            {p.primary_contact && (
+                              <span className="font-mono text-[10px] uppercase tracking-wide text-text-3">
+                                primary
+                              </span>
+                            )}
+                            {p.school_history && (
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium ${
+                                p.school_history === "Teacher"
+                                  ? "bg-green-soft text-green-deep"
+                                  : "bg-gold-soft text-gold"
+                              }`}>
+                                {p.school_history}
+                              </span>
+                            )}
+                          </div>
+                          {p.email && (
+                            <p className="text-[12.5px] text-text-2">{p.email}</p>
+                          )}
+                          {p.phone && (
+                            <p className="font-mono text-[12px] text-text-2">{p.phone}</p>
+                          )}
+                        </div>
+                      ))}
+                </div>
+
+                {/* Add parent button (edit mode only) */}
+                {isEditing && (
+                  <button
+                    onClick={addNewParent}
+                    className="mt-3 flex items-center gap-1.5 text-[12.5px] text-green hover:text-green-deep font-medium transition-colors"
+                  >
+                    <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+                      <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+                    </svg>
+                    Add parent
+                  </button>
+                )}
+              </div>
+
+              {/* ── Children ─────────────────────────────────────────────── */}
+              <div className="border-t border-border pt-5">
+                <FieldLabel>Children</FieldLabel>
+
+                {(family?.children ?? []).length === 0 ? (
+                  <p className="text-[13px] text-text-3 italic">No children linked to this family.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {(family?.children ?? []).map((child) => (
+                      <div key={child.id}>
+                        <p className="font-serif text-[14px] font-medium text-text">
+                          {child.first_name} {child.last_name}
+                        </p>
+                        {child.items.length === 0 ? (
+                          <p className="text-[12px] text-text-3 italic mt-0.5">No waitlist entries</p>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {child.items.map((item, idx) => {
+                              const s = item.status ?? "";
+                              const style = STATUS_STYLES[s] ?? { bg: "bg-gray-soft", text: "text-text-3" };
+                              return (
+                                <span
+                                  key={idx}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium ${style.bg} ${style.text}`}
+                                >
+                                  {s}
+                                  {item.term_name && (
+                                    <span className="opacity-70">· {item.term_name}</span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Save error */}
+              {saveError && (
+                <p className="text-[12.5px] text-terra leading-snug">{saveError}</p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer — edit mode only */}
+        {isEditing && (
+          <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-end gap-3">
+            <button
+              onClick={handleCancel}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg text-[13px] text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-green hover:bg-green-deep transition-colors disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
