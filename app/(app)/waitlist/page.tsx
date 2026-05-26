@@ -21,7 +21,7 @@ export default async function ChildrenPage() {
         .order("child_full_name", { ascending: true }),
       supabase
         .from("school_terms")
-        .select("id, name, sort_order")
+        .select("id, name, status, start_date, end_date, sort_order")
         .order("sort_order", { ascending: true }),
       user
         ? supabase

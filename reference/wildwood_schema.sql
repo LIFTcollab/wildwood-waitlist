@@ -234,7 +234,12 @@ AS
 -- waitlist_items_view
 -- Denormalized view of waitlist_items joined with children and school_terms.
 -- Primary data source for the staff waitlist UI.
-CREATE OR REPLACE VIEW public.waitlist_items_view AS
+-- SECURITY INVOKER so RLS policies are enforced for the calling user.
+-- term_name is plain text (no enum cast) so any new term name is immediately
+-- visible without requiring an ALTER TYPE migration.
+CREATE VIEW public.waitlist_items_view
+WITH (security_invoker = true)               -- [HARDENED] explicit invoker semantics
+AS
   SELECT
     wi.id,
     wi.status                            AS status,
@@ -258,19 +263,22 @@ CREATE OR REPLACE VIEW public.waitlist_items_view AS
       WHEN 'Regular'  THEN 5
       ELSE NULL
     END                                  AS priority_rank,
-    st.name::public.school_term_name_enum AS term_name,
+    st.name                              AS term_name,
     st.start_date                        AS term_start_date,
     st.end_date                          AS term_end_date,
     st.status                            AS term_status
   FROM public.waitlist_items wi
-  JOIN public.children c     ON wi.child_id = c.id
+  JOIN public.children c      ON wi.child_id = c.id
   JOIN public.school_terms st ON wi.term_id  = st.id;
 
 
 -- waitlist_tasks_view
 -- task_name is computed live as "<first> <last>: <term>" — never stored.
 -- Always current even if child name or term changes.
-CREATE OR REPLACE VIEW public.waitlist_tasks_view AS
+-- SECURITY INVOKER so RLS policies are enforced for the calling user.
+CREATE OR REPLACE VIEW public.waitlist_tasks_view
+WITH (security_invoker = true)               -- [HARDENED] explicit invoker semantics
+AS
   SELECT
     t.id                                                      AS task_id,
     (c.first_name || ' ' || c.last_name || ': ' || st.name)  AS task_name,
@@ -894,6 +902,20 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text) TO authenticated;
 --             [6] check_email_exists already queries auth.users directly,
 --                 so the user_profiles_view restructure did not affect login.
 --
+-- 2026-05-26  Term management UI + view hardening:
+--             [1] Dropped school_term_name_enum cast from waitlist_items_view
+--                 (term_name is now plain text). Required DROP + recreate.
+--             [2] Added WITH (security_invoker = true) to waitlist_items_view
+--                 (was missing — second Supabase Advisor issue fixed).
+--             [3] Re-attached trg_update_waitlist_items_view trigger.
+--             [4] Added app/actions/terms.ts: createTerm, updateTerm.
+--             [5] Added /settings page with TermsManager component.
+--             [6] Added Settings link to TopNav.
+-- 2026-05-26  Security hardening — waitlist_tasks_view SECURITY INVOKER:
+--             Supabase Advisor flagged waitlist_tasks_view as SECURITY DEFINER
+--             (it was recreated without security_invoker = true in the previous
+--             migration). Fixed with ALTER VIEW ... SET (security_invoker = on).
+--             Reference schema updated to match.
 -- 2026-05-26  Task name — moved from stored column to live view computation:
 --             [1] Dropped tasks.name column (was a denormalized snapshot prone
 --                 to going stale if child name or term changed).

@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", exact: true  },
   { href: "/waitlist",  label: "Waitlist",  exact: false },
   { href: "/families",  label: "Families",  exact: false },
+  { href: "/settings",  label: "Settings",  exact: false },
 ] as const;
 
 export function TopNav() {

@@ -22,5 +22,8 @@ export type WaitlistItem = {
 export type SchoolTerm = {
   id: string;
   name: string;
+  status: string | null;
+  start_date: string | null;
+  end_date: string | null;
   sort_order: number | null;
 };
