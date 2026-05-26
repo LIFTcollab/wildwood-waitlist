@@ -7,6 +7,7 @@ import {
   updateParent,
   addParent,
   deleteParent,
+  moveChildToFamily,
   type ParentData,
 } from "@/app/actions/families";
 import type { FamilyRow } from "./FamiliesTable";
@@ -145,6 +146,15 @@ export function FamilyDetailPanel({
   const [form,       setForm]       = useState<FamilyForm>({ name: "", parents: [] });
   const [confirmKey, setConfirmKey] = useState<string | null>(null); // parent _key pending remove
   const [removeErr,  setRemoveErr]  = useState<string | null>(null);
+
+  // ── Move child state ───────────────────────────────────────────────────────
+  type FamilyOption = { id: string; name: string };
+  const [movingChildId,   setMovingChildId]   = useState<string | null>(null);
+  const [familySearch,    setFamilySearch]    = useState("");
+  const [allFamilies,     setAllFamilies]     = useState<FamilyOption[]>([]);
+  const [familiesLoaded,  setFamiliesLoaded]  = useState(false);
+  const [moving,          setMoving]          = useState(false);
+  const [moveError,       setMoveError]       = useState<string | null>(null);
 
   // Fetch full family detail whenever the panel opens
   useEffect(() => {
@@ -329,6 +339,43 @@ export function FamilyDetailPanel({
     setIsEditing(false);
     setSaveError(null);
     setConfirmKey(null);
+    setMovingChildId(null);
+    setFamilySearch("");
+    setMoveError(null);
+  }
+
+  async function openMoveChild(childId: string) {
+    setMovingChildId(childId);
+    setFamilySearch("");
+    setMoveError(null);
+    // Load families once, lazily
+    if (!familiesLoaded) {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("families")
+        .select("id, name")
+        .order("name");
+      setAllFamilies((data ?? []) as FamilyOption[]);
+      setFamiliesLoaded(true);
+    }
+  }
+
+  async function handleMoveChild(targetFamilyId: string, childId: string) {
+    setMoving(true);
+    setMoveError(null);
+    const result = await moveChildToFamily(childId, targetFamilyId);
+    if (result.error) {
+      setMoveError(result.error);
+      setMoving(false);
+      return;
+    }
+    // Remove child from local family state
+    setFamily((prev) =>
+      prev ? { ...prev, children: prev.children.filter((c) => c.id !== childId) } : prev
+    );
+    setMovingChildId(null);
+    setFamilySearch("");
+    setMoving(false);
   }
 
   async function handleSave() {
@@ -658,9 +705,22 @@ export function FamilyDetailPanel({
                   <div className="space-y-4">
                     {(family?.children ?? []).map((child) => (
                       <div key={child.id}>
-                        <p className="font-serif text-[14px] font-medium text-text">
-                          {child.first_name} {child.last_name}
-                        </p>
+                        {/* Name row + Move button */}
+                        <div className="flex items-center gap-2">
+                          <p className="font-serif text-[14px] font-medium text-text">
+                            {child.first_name} {child.last_name}
+                          </p>
+                          {isEditing && canEdit && movingChildId !== child.id && (
+                            <button
+                              onClick={() => openMoveChild(child.id)}
+                              className="text-[11px] text-text-3 hover:text-text-2 underline underline-offset-2 transition-colors"
+                            >
+                              Move
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Status pills */}
                         {child.items.length === 0 ? (
                           <p className="text-[12px] text-text-3 italic mt-0.5">No waitlist entries</p>
                         ) : (
@@ -680,6 +740,71 @@ export function FamilyDetailPanel({
                                 </span>
                               );
                             })}
+                          </div>
+                        )}
+
+                        {/* Inline family picker — shown when Move is clicked */}
+                        {movingChildId === child.id && (
+                          <div className="mt-2 rounded-xl border border-border bg-surface-warm p-3 space-y-2">
+                            <p className="text-[11.5px] text-text-3">Move to which family?</p>
+
+                            {/* Search */}
+                            <div className="relative">
+                              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-3 pointer-events-none" viewBox="0 0 16 16" fill="none">
+                                <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
+                                <path d="m10.5 10.5 3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                              <input
+                                autoFocus
+                                type="text"
+                                placeholder="Search families…"
+                                value={familySearch}
+                                onChange={(e) => setFamilySearch(e.target.value)}
+                                className={inputCls + " pl-8 text-[12.5px]"}
+                              />
+                            </div>
+
+                            {/* Family list */}
+                            <div className="max-h-[180px] overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                              {allFamilies
+                                .filter(
+                                  (f) =>
+                                    f.id !== family?.id &&
+                                    (!familySearch.trim() ||
+                                      f.name.toLowerCase().includes(familySearch.toLowerCase()))
+                                )
+                                .map((f) => (
+                                  <button
+                                    key={f.id}
+                                    onClick={() => handleMoveChild(f.id, child.id)}
+                                    disabled={moving}
+                                    className="w-full text-left px-3 py-2 text-[13px] text-text hover:bg-surface-hover transition-colors disabled:opacity-50"
+                                  >
+                                    {f.name}
+                                  </button>
+                                ))}
+                              {allFamilies.filter(
+                                (f) =>
+                                  f.id !== family?.id &&
+                                  (!familySearch.trim() ||
+                                    f.name.toLowerCase().includes(familySearch.toLowerCase()))
+                              ).length === 0 && (
+                                <p className="px-3 py-2 text-[12.5px] text-text-3 italic">
+                                  {familiesLoaded ? "No families found." : "Loading…"}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Error + cancel */}
+                            {moveError && (
+                              <p className="text-[12px] text-terra">{moveError}</p>
+                            )}
+                            <button
+                              onClick={() => { setMovingChildId(null); setFamilySearch(""); setMoveError(null); }}
+                              className="text-[12px] text-text-3 hover:text-text transition-colors"
+                            >
+                              Cancel
+                            </button>
                           </div>
                         )}
                       </div>

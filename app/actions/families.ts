@@ -65,3 +65,33 @@ export async function deleteParent(
   revalidatePath("/families");
   return { error: null };
 }
+
+export async function moveChildToFamily(
+  childId: string,
+  familyId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can reassign children" };
+
+  const { error } = await supabase
+    .from("children")
+    .update({ family_id: familyId })
+    .eq("id", childId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/families");
+  revalidatePath("/waitlist");
+  return { error: null };
+}
