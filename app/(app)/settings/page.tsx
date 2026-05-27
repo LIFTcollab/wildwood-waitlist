@@ -22,6 +22,7 @@ export default async function SettingsPage() {
   ]);
 
   const canEdit = ["Admin", "Director"].includes(profile?.role ?? "");
+  const isAdmin = profile?.role === "Admin";
   const terms   = (termsData ?? []) as SchoolTerm[];
 
   return (
@@ -54,19 +55,21 @@ export default async function SettingsPage() {
         <TermsManager initialTerms={terms} canEdit={canEdit} />
       </section>
 
-      {/* Data integrity section */}
-      <section className="border-t border-border pt-8">
-        <div className="mb-4">
-          <h2 className="font-serif text-[18px] font-medium text-text">
-            Data integrity
-          </h2>
-          <p className="text-[12.5px] text-text-3 mt-0.5">
-            Checks families, parents, and children for missing links and inconsistencies.
-          </p>
-        </div>
+      {/* Data integrity section — Admin only */}
+      {isAdmin && (
+        <section className="border-t border-border pt-8">
+          <div className="mb-4">
+            <h2 className="font-serif text-[18px] font-medium text-text">
+              Data integrity
+            </h2>
+            <p className="text-[12.5px] text-text-3 mt-0.5">
+              Checks families, parents, and children for missing links and inconsistencies.
+            </p>
+          </div>
 
-        <DataIntegrityPanel />
-      </section>
+          <DataIntegrityPanel />
+        </section>
+      )}
     </div>
   );
 }
