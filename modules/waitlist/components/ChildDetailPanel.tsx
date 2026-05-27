@@ -166,7 +166,7 @@ export function ChildDetailPanel({
       try {
         const { data } = await supabase
           .from("wl_children")
-          .select("families(id, name, parents(id, first_name, last_name, primary_contact), children(id, first_name, last_name))")
+          .select("families:wl_families(id, name, parents:wl_parents(id, first_name, last_name, primary_contact), children:wl_children(id, first_name, last_name))")
           .eq("id", item.child_id)
           .single();
         setFamilyInfo((data?.families as unknown as FamilyInfo) ?? null);

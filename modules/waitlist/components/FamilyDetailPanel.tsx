@@ -191,8 +191,8 @@ export function FamilyDetailPanel({
           .from("wl_families")
           .select(
             "id, name, organization_id, priority_status, " +
-            "parents(id, first_name, last_name, email, phone, primary_contact, school_history), " +
-            "children(id, first_name, last_name)"
+            "parents:wl_parents(id, first_name, last_name, email, phone, primary_contact, school_history), " +
+            "children:wl_children(id, first_name, last_name)"
           )
           .eq("id", familyId)
           .single();

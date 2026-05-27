@@ -123,7 +123,7 @@ function StepFamily({
       try {
         const { data } = await supabase
           .from("wl_families")
-          .select("id, name, children(id, first_name, last_name)")
+          .select("id, name, children:wl_children(id, first_name, last_name)")
           .order("name");
         setFamilies((data ?? []) as FamilyOption[]);
       } finally {

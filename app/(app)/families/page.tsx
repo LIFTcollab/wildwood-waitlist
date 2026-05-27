@@ -19,7 +19,7 @@ export default async function FamiliesPage({
     supabase
       .from("wl_families")
       .select(
-        "id, name, created_at, priority_status, priority_rank, children(id, first_name, last_name), parents(id, first_name, last_name, primary_contact)"
+        "id, name, created_at, priority_status, priority_rank, children:wl_children(id, first_name, last_name), parents:wl_parents(id, first_name, last_name, primary_contact)"
       )
       .order("priority_rank", { ascending: true })
       .order("name",          { ascending: true }),
