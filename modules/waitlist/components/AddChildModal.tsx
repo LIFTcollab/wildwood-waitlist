@@ -458,17 +458,17 @@ export function AddChildModal({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Reset everything when modal opens
+  // Reset everything when modal opens; pre-select first term so submit isn't blocked
   useEffect(() => {
     if (isOpen) {
       setStep(1);
       setFamily(null);
       setChild({ first_name: "", last_name: "", dob: "" });
-      setWl({ term_id: "", status: "Waitlisted", classroom: "", date_applied: "", notes: "" });
+      setWl({ term_id: terms[0]?.id ?? "", status: "Waitlisted", classroom: "", date_applied: "", notes: "" });
       setSubmitting(false);
       setSubmitError(null);
     }
-  }, [isOpen]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape
   useEffect(() => {

@@ -52,6 +52,44 @@ export async function createTerm(
   return { error: null, term: term as SchoolTerm };
 }
 
+export async function deleteTerm(
+  id: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can manage terms" };
+
+  const { count } = await supabase
+    .from("wl_waitlist_items")
+    .select("id", { count: "exact", head: true })
+    .eq("term_id", id);
+
+  if (count && count > 0)
+    return { error: `Cannot delete: ${count} waitlist ${count === 1 ? "entry uses" : "entries use"} this term` };
+
+  const { error } = await supabase
+    .from("wl_school_terms")
+    .delete()
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  revalidatePath("/waitlist");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function updateTerm(
   id: string,
   input: TermInput

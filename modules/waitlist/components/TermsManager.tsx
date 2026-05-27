@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createTerm, updateTerm, type TermInput } from "@/modules/waitlist/lib/actions/terms";
+import { createTerm, updateTerm, deleteTerm, type TermInput } from "@/modules/waitlist/lib/actions/terms";
 import type { SchoolTerm } from "@/modules/waitlist/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -176,11 +176,28 @@ export function TermsManager({
   initialTerms: SchoolTerm[];
   canEdit: boolean;
 }) {
-  const [terms,     setTerms]     = useState<SchoolTerm[]>(initialTerms);
-  const [editingId, setEditingId] = useState<string | null>(null); // "new" = adding
-  const [form,      setForm]      = useState<TermInput>(EMPTY_FORM);
-  const [saving,    setSaving]    = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
+  const [terms,       setTerms]       = useState<SchoolTerm[]>(initialTerms);
+  const [editingId,   setEditingId]   = useState<string | null>(null); // "new" = adding
+  const [form,        setForm]        = useState<TermInput>(EMPTY_FORM);
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
+  const [confirmId,   setConfirmId]   = useState<string | null>(null); // id pending delete confirm
+  const [deleting,    setDeleting]    = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete(id: string) {
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteTerm(id);
+    if (result.error) {
+      setDeleteError(result.error);
+      setDeleting(false);
+      return;
+    }
+    setTerms((prev) => prev.filter((t) => t.id !== id));
+    setConfirmId(null);
+    setDeleting(false);
+  }
 
   function startEdit(term: SchoolTerm) {
     setEditingId(term.id);
@@ -288,17 +305,51 @@ export function TermsManager({
               )}
             </div>
 
-            {/* Edit button */}
+            {/* Edit + Delete buttons */}
             {canEdit && editingId === null && (
-              <button
-                onClick={() => startEdit(term)}
-                className="ml-auto flex-shrink-0 px-2.5 py-1 rounded-lg text-[12px] font-medium text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors"
-              >
-                Edit
-              </button>
+              <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+                {confirmId === term.id ? (
+                  <>
+                    <span className="text-[12px] text-terra">Delete this term?</span>
+                    <button
+                      onClick={() => handleDelete(term.id)}
+                      disabled={deleting}
+                      className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-white bg-terra hover:opacity-80 transition-opacity disabled:opacity-50"
+                    >
+                      {deleting ? "Deleting…" : "Yes, delete"}
+                    </button>
+                    <button
+                      onClick={() => { setConfirmId(null); setDeleteError(null); }}
+                      disabled={deleting}
+                      className="px-2.5 py-1 rounded-lg text-[12px] text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => startEdit(term)}
+                      className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => { setConfirmId(term.id); setDeleteError(null); }}
+                      className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-terra border border-border hover:border-terra hover:bg-surface-warm transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
             )}
           </div>
         )
+      )}
+
+      {deleteError && (
+        <p className="text-[12px] text-terra px-1">{deleteError}</p>
       )}
 
       {/* Add term form / button */}

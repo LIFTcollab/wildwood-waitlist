@@ -317,10 +317,10 @@ export function ChildDetailPanel({
     setAddingTask(false);
   }
 
-  // Task inline edit handlers
+  // Task inline edit handlers — edit only the description, not the auto-generated name
   function startTaskEdit(task: TaskInfo) {
     setEditingTaskId(task.task_id);
-    setEditingText(task.task_description || task.task_name);
+    setEditingText(task.task_description ?? "");
   }
 
   function cancelTaskEdit() {
@@ -675,7 +675,9 @@ export function ChildDetailPanel({
 
                           {isEditingThis ? (
                             /* ── Inline edit mode ── */
-                            <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                            <div className="flex-1 flex flex-col gap-1 min-w-0">
+                              <p className="text-[11px] text-text-3 truncate">{task.task_name}</p>
+                              <div className="flex items-center gap-1.5">
                               <input
                                 autoFocus
                                 value={editingText}
@@ -684,6 +686,7 @@ export function ChildDetailPanel({
                                   if (e.key === "Enter")  saveTaskEdit(task.task_id);
                                   if (e.key === "Escape") cancelTaskEdit();
                                 }}
+                                placeholder="Add a description…"
                                 className="flex-1 min-w-0 px-2 py-1 bg-surface border border-green rounded-md text-[12.5px] text-text focus:outline-none"
                               />
                               {/* Save */}
@@ -707,6 +710,7 @@ export function ChildDetailPanel({
                                   <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
                                 </svg>
                               </button>
+                              </div>
                             </div>
                           ) : (
                             /* ── View mode — pencil appears on row hover ── */
