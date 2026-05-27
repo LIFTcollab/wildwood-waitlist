@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  updateFamilyName,
   updateParent,
   addParent,
   deleteParent,
@@ -61,9 +60,19 @@ type ParentForm = {
 };
 
 type FamilyForm = {
-  name:    string;
   parents: ParentForm[];
 };
+
+// Mirrors the DB trigger: distinct last names, alphabetical, joined with "-"
+function computeFamilyName(
+  parents: { last_name: string }[],
+  fallback: string
+): string {
+  const names = [...new Set(
+    parents.map((p) => p.last_name.trim()).filter(Boolean)
+  )].sort();
+  return names.length > 0 ? names.join("-") : fallback;
+}
 
 // ─── Semantic color maps ──────────────────────────────────────────────────────
 
@@ -146,7 +155,7 @@ export function FamilyDetailPanel({
   const [isEditing,  setIsEditing]  = useState(false);
   const [saving,     setSaving]     = useState(false);
   const [saveError,  setSaveError]  = useState<string | null>(null);
-  const [form,       setForm]       = useState<FamilyForm>({ name: "", parents: [] });
+  const [form,       setForm]       = useState<FamilyForm>({ parents: [] });
   const [confirmKey, setConfirmKey] = useState<string | null>(null); // parent _key pending remove
   const [removeErr,  setRemoveErr]  = useState<string | null>(null);
 
@@ -243,7 +252,6 @@ export function FamilyDetailPanel({
 
         setFamily(detail);
         setForm({
-          name:    detail.name,
           parents: detail.parents.map(parentToForm),
         });
       } finally {
@@ -334,7 +342,7 @@ export function FamilyDetailPanel({
     // Sync table row using the captured list (not stale `family` closure)
     if (family) {
       onUpdate(family.id, {
-        name:    family.name,
+        name:    computeFamilyName(remainingParents, family.name),
         parents: remainingParents.map((fp) => ({
           id:              fp.id,
           first_name:      fp.first_name,
@@ -347,7 +355,7 @@ export function FamilyDetailPanel({
 
   function handleCancel() {
     if (!family) return;
-    setForm({ name: family.name, parents: family.parents.map(parentToForm) });
+    setForm({ parents: family.parents.map(parentToForm) });
     setIsEditing(false);
     setSaveError(null);
     setConfirmKey(null);
@@ -411,7 +419,7 @@ export function FamilyDetailPanel({
     setParentMoving(false);
     if (family) {
       onUpdate(family.id, {
-        name:    family.name,
+        name:    computeFamilyName(remaining, family.name),
         parents: remaining.map((fp) => ({
           id:              fp.id,
           first_name:      fp.first_name,
@@ -444,16 +452,6 @@ export function FamilyDetailPanel({
     if (!family) return;
     setSaving(true);
     setSaveError(null);
-
-    // Update family name if changed — fail fast so retry doesn't re-send
-    if (form.name.trim() !== family.name) {
-      const r = await updateFamilyName(family.id, form.name.trim());
-      if (r.error) {
-        setSaveError(r.error);
-        setSaving(false);
-        return;
-      }
-    }
 
     // Update existing parents in parallel — fail fast on any error
     const existing = form.parents.filter((p) => p.id !== null);
@@ -494,21 +492,21 @@ export function FamilyDetailPanel({
       school_history:  (p.school_history as "Board" | "Teacher" | "Alumni") || null,
     }));
 
+    const computedName = computeFamilyName(updatedParents, family.name);
     const updatedFamily: FamilyDetail = {
       ...family,
-      name:    form.name.trim(),
+      name:    computedName,
       parents: updatedParents,
     };
     setFamily(updatedFamily);
     // Patch form keys with real ids for any newly inserted parents
     setForm({
-      name:    updatedFamily.name,
       parents: updatedParents.map(parentToForm),
     });
 
     // Sync the families table row
     onUpdate(family.id, {
-      name: updatedFamily.name,
+      name: computedName,
       parents: updatedParents.map((p) => ({
         id:              p.id,
         first_name:      p.first_name,
@@ -544,12 +542,14 @@ export function FamilyDetailPanel({
             {loading ? (
               <div className="h-7 w-40 bg-border rounded animate-pulse" />
             ) : isEditing ? (
-              <input
-                value={form.name}
-                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Family name"
-                className={inputCls + " font-serif text-[18px] font-medium"}
-              />
+              <>
+                <h2 className="font-serif text-[22px] font-medium text-text leading-tight truncate">
+                  {computeFamilyName(form.parents, family?.name ?? "—")}
+                </h2>
+                <p className="text-[11px] text-text-3 italic mt-0.5">
+                  Name is auto-generated from parent last names
+                </p>
+              </>
             ) : (
               <>
                 <h2 className="font-serif text-[22px] font-medium text-text leading-tight truncate">
