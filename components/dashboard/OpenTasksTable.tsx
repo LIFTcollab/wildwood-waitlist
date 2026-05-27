@@ -254,10 +254,8 @@ export function OpenTasksTable({ tasks: initialTasks }: { tasks: TaskRow[] }) {
         <div className="bg-surface border border-border rounded-[10px] overflow-hidden">
           <table className="w-full text-[13px] border-collapse">
             <colgroup>
-              <col className="w-[16%]" />
-              <col className="w-[17%]" />
-              <col className="w-[10%]" />
-              <col className="w-[10%]" />
+              <col className="w-[35%]" />
+              <col className="w-[12%]" />
               <col />
               <col className="w-[5%]" />
             </colgroup>
@@ -265,12 +263,6 @@ export function OpenTasksTable({ tasks: initialTasks }: { tasks: TaskRow[] }) {
               <tr className="bg-surface-warm border-b border-border text-left">
                 <th className="px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-text-3">
                   Task
-                </th>
-                <th className="px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-text-3">
-                  Child
-                </th>
-                <th className="px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-text-3">
-                  Term
                 </th>
                 <th className="px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-text-3">
                   Status
@@ -289,14 +281,6 @@ export function OpenTasksTable({ tasks: initialTasks }: { tasks: TaskRow[] }) {
                 >
                   <td className="px-5 py-3 font-medium text-text align-top">
                     {task.task_name}
-                  </td>
-                  <td className="px-5 py-3 align-top">
-                    <span className="font-serif text-[13.5px] text-text">
-                      {task.child_full_name}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 font-mono text-[12px] text-text-3 align-top whitespace-nowrap">
-                    {task.term_name}
                   </td>
                   <td className="px-5 py-3 align-top">
                     <TaskStatusPill value={task.task_status} />
