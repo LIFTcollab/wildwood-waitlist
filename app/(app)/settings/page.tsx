@@ -52,7 +52,7 @@ export default async function SettingsPage() {
           </div>
         </div>
 
-        <TermsManager initialTerms={terms} canEdit={canEdit} />
+        <TermsManager initialTerms={terms} canEdit={canEdit} isAdmin={isAdmin} />
       </section>
 
       {/* Data integrity section — Admin only */}

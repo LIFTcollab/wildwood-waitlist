@@ -172,9 +172,11 @@ function StatusPill({ status }: { status: string | null }) {
 export function TermsManager({
   initialTerms,
   canEdit,
+  isAdmin = false,
 }: {
   initialTerms: SchoolTerm[];
   canEdit: boolean;
+  isAdmin?: boolean;
 }) {
   const [terms,       setTerms]       = useState<SchoolTerm[]>(initialTerms);
   const [editingId,   setEditingId]   = useState<string | null>(null); // "new" = adding
@@ -334,12 +336,14 @@ export function TermsManager({
                     >
                       Edit
                     </button>
-                    <button
-                      onClick={() => { setConfirmId(term.id); setDeleteError(null); }}
-                      className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-terra border border-border hover:border-terra hover:bg-surface-warm transition-colors"
-                    >
-                      Delete
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setConfirmId(term.id); setDeleteError(null); }}
+                        className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-terra border border-border hover:border-terra hover:bg-surface-warm transition-colors"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </>
                 )}
               </div>
