@@ -19,9 +19,10 @@ export default async function FamiliesPage({
     supabase
       .from("families")
       .select(
-        "id, name, created_at, children(id, first_name, last_name), parents(id, first_name, last_name, primary_contact)"
+        "id, name, created_at, priority_status, priority_rank, children(id, first_name, last_name), parents(id, first_name, last_name, primary_contact)"
       )
-      .order("name", { ascending: true }),
+      .order("priority_rank", { ascending: true })
+      .order("name",          { ascending: true }),
     user
       ? supabase
           .from("user_profiles_view")

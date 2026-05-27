@@ -2,13 +2,16 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { FamilyDetailPanel } from "./FamilyDetailPanel";
+import { PriorityPill } from "./WaitlistTable";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type FamilyRow = {
-  id: string;
-  name: string;
-  created_at: string;
+  id:              string;
+  name:            string;
+  created_at:      string;
+  priority_status: string | null;
+  priority_rank:   number | null;
   children: { id: string; first_name: string; last_name: string }[];
   parents:  { id: string; first_name: string; last_name: string; primary_contact: boolean }[];
 };
@@ -18,7 +21,7 @@ export type FamilyRow = {
 const PER_PAGE_OPTIONS = [25, 50, 100] as const;
 type PerPage = (typeof PER_PAGE_OPTIONS)[number];
 
-type SortKey = "name" | "children" | "parents";
+type SortKey = "priority" | "name" | "children" | "parents";
 type SortDir = "asc" | "desc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -110,7 +113,7 @@ export function FamiliesTable({
   const [search,   setSearch]   = useState("");
   const [page,     setPage]     = useState(1);
   const [perPage,  setPerPage]  = useState<PerPage>(25);
-  const [sortKey,  setSortKey]  = useState<SortKey>("name");
+  const [sortKey,  setSortKey]  = useState<SortKey>("priority");
   const [sortDir,  setSortDir]  = useState<SortDir>("asc");
   const [selectedId, setSelectedId] = useState<string | null>(openFamilyId ?? null);
 
@@ -163,6 +166,13 @@ export function FamiliesTable({
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
+      if (sortKey === "priority") {
+        const ar = a.priority_rank ?? 99;
+        const br = b.priority_rank ?? 99;
+        return ar !== br
+          ? (ar - br) * dir
+          : (a.name ?? "").localeCompare(b.name ?? "");
+      }
       if (sortKey === "name") {
         return (a.name ?? "").localeCompare(b.name ?? "") * dir;
       }
@@ -265,8 +275,9 @@ export function FamiliesTable({
         <table className="w-full text-[13.5px] border-collapse">
           <colgroup>
             <col className="w-10" />
-            <col className="w-[26%]" />
-            <col className="w-[34%]" />
+            <col className="w-[22%]" />
+            <col className="w-28" />
+            <col className="w-[30%]" />
             <col />
           </colgroup>
           <thead>
@@ -277,6 +288,13 @@ export function FamiliesTable({
               <SortTh
                 label="Family Name"
                 sortKey="name"
+                active={sortKey}
+                dir={sortDir}
+                onSort={handleSort}
+              />
+              <SortTh
+                label="Priority"
+                sortKey="priority"
                 active={sortKey}
                 dir={sortDir}
                 onSort={handleSort}
@@ -301,7 +319,7 @@ export function FamiliesTable({
             {pageRows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-4 py-14 text-center text-text-3 text-sm"
                 >
                   {hasSearch
@@ -330,6 +348,9 @@ export function FamiliesTable({
                       <span className="font-serif text-[14px] font-medium text-text">
                         {family.name || "—"}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <PriorityPill value={family.priority_status} />
                     </td>
                     <td className="px-4 py-3">
                       {family.children.length === 0 ? (
