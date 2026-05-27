@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { checkDataIntegrity, type IntegrityIssue } from "@/app/actions/integrity";
+import { checkDataIntegrity, type IntegrityIssue } from "@/modules/waitlist/lib/actions/integrity";
 
 // ─── Pagination constants ─────────────────────────────────────────────────────
 

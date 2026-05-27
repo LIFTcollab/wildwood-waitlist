@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { updateTask } from "@/app/actions/tasks";
+import { updateTask } from "@/modules/waitlist/lib/actions/tasks";
 
 // ─── Types ──────────────────���─────────────────────────────────────────────────
 

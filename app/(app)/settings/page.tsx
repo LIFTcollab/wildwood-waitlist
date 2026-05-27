@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { TermsManager } from "@/components/dashboard/TermsManager";
-import { DataIntegrityPanel } from "@/components/dashboard/DataIntegrityPanel";
-import type { SchoolTerm } from "@/lib/types/waitlist";
+import { TermsManager } from "@/modules/waitlist/components/TermsManager";
+import { DataIntegrityPanel } from "@/modules/waitlist/components/DataIntegrityPanel";
+import type { SchoolTerm } from "@/modules/waitlist/types";
 
 export default async function SettingsPage() {
   const supabase = await createClient();

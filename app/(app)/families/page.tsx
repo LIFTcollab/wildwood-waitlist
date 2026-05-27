@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { FamiliesTable, type FamilyRow } from "@/components/dashboard/FamiliesTable";
+import { FamiliesTable, type FamilyRow } from "@/modules/waitlist/components/FamiliesTable";
 
 export const metadata = { title: "Families — Wildwood" };
 

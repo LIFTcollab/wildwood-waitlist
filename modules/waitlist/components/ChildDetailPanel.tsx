@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
+import type { WaitlistItem, SchoolTerm } from "@/modules/waitlist/types";
 import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
-import { updateWaitlistItem, createTask } from "@/app/actions/waitlist";
+import { updateWaitlistItem, createTask } from "@/modules/waitlist/lib/actions/waitlist";
 import { createClient } from "@/lib/supabase/client";
 
 // ─── Family info types (fetched on demand) ────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { SchoolTerm } from "@/lib/types/waitlist";
+import type { SchoolTerm } from "@/modules/waitlist/types";
 
 export type TermInput = {
   name:       string;

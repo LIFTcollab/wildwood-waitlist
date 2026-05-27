@@ -317,6 +317,128 @@ AS
   JOIN public.school_terms st   ON st.id  = wi.term_id;
 
 
+-- data_integrity_issues
+-- Admin/Director-only diagnostic view. Returns data quality problems across
+-- families, parents, children, and waitlist entries. Used by DataIntegrityPanel
+-- in /settings (app/actions/integrity.ts).
+--
+-- Checks performed (each as one UNION branch):
+--   no_parents            [error]   — family exists with zero parents
+--   no_children           [warning] — family exists with zero children
+--   no_waitlist_entry     [warning] — child exists with no waitlist_items row
+--   no_primary_contact    [warning] — family has parents but none is primary_contact
+--   multiple_primary_contacts [warning] — more than one primary_contact per family
+--   name_drift            [error]   — family.name doesn't match sorted parent last names
+--   duplicate_email       [error]   — same email on two or more parents in the org
+--
+-- Columns: issue_type text, severity text, description text,
+--          family_id uuid, family_name text, entity_id uuid
+--
+-- Security note: this view was created WITHOUT security_invoker = true
+-- (Supabase Advisor will flag it). The underlying tables all have RLS, so
+-- data is still tenant-isolated. Phase 1.3 will recreate this view with
+-- WITH (security_invoker = true) and wl_-prefixed table names.
+--
+-- Grant: SELECT on authenticated (anon revoked). No RLS on the view itself
+-- (views don't need it; RLS on the base tables provides the isolation).
+CREATE VIEW public.data_integrity_issues
+AS
+  -- families with no parents at all
+  SELECT 'no_parents'::text                     AS issue_type,
+         'error'::text                           AS severity,
+         'Family has no parents'::text           AS description,
+         f.id                                    AS family_id,
+         f.name                                  AS family_name,
+         NULL::uuid                              AS entity_id
+  FROM public.families f
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.parents p WHERE p.family_id = f.id
+  )
+
+  UNION ALL
+
+  -- families with no children at all
+  SELECT 'no_children'::text,
+         'warning'::text,
+         'Family has no children'::text,
+         f.id, f.name, NULL::uuid
+  FROM public.families f
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.children c WHERE c.family_id = f.id
+  )
+
+  UNION ALL
+
+  -- children with no waitlist entry
+  SELECT 'no_waitlist_entry'::text,
+         'warning'::text,
+         'Child has no waitlist entry: ' || c.first_name || ' ' || c.last_name,
+         c.family_id, f.name, c.id
+  FROM public.children c
+  JOIN public.families f ON f.id = c.family_id
+  WHERE NOT EXISTS (
+    SELECT 1 FROM public.waitlist_items wi WHERE wi.child_id = c.id
+  )
+
+  UNION ALL
+
+  -- families with parents but no primary contact
+  SELECT 'no_primary_contact'::text,
+         'warning'::text,
+         'Family has no primary contact set'::text,
+         f.id, f.name, NULL::uuid
+  FROM public.families f
+  WHERE EXISTS (SELECT 1 FROM public.parents p WHERE p.family_id = f.id)
+    AND NOT EXISTS (
+      SELECT 1 FROM public.parents p WHERE p.family_id = f.id AND p.primary_contact = true
+    )
+
+  UNION ALL
+
+  -- families with more than one primary contact
+  SELECT 'multiple_primary_contacts'::text,
+         'warning'::text,
+         'Family has ' || count(*) || ' primary contacts',
+         f.id, f.name, NULL::uuid
+  FROM public.families f
+  JOIN public.parents p ON p.family_id = f.id AND p.primary_contact = true
+  GROUP BY f.id, f.name
+  HAVING count(*) > 1
+
+  UNION ALL
+
+  -- family.name doesn't match sorted parent last names
+  SELECT 'name_drift'::text,
+         'error'::text,
+         'Family name "' || f.name || '" doesn''t match parent last names',
+         f.id, f.name, NULL::uuid
+  FROM public.families f
+  WHERE f.name IS DISTINCT FROM (
+    SELECT string_agg(sub.last_name, '-' ORDER BY sub.last_name)
+    FROM (
+      SELECT DISTINCT trim(p.last_name) AS last_name
+      FROM public.parents p
+      WHERE p.family_id = f.id AND trim(p.last_name) <> ''
+    ) sub
+  )
+  AND EXISTS (SELECT 1 FROM public.parents p WHERE p.family_id = f.id)
+
+  UNION ALL
+
+  -- same email used by multiple parents within the same org
+  SELECT 'duplicate_email'::text,
+         'error'::text,
+         'Email shared by multiple parents: ' || p.email,
+         p.family_id, f.name, p.id
+  FROM public.parents p
+  JOIN public.families f ON f.id = p.family_id
+  WHERE p.email IS NOT NULL
+    AND (
+      SELECT count(*) FROM public.parents p2
+      WHERE p2.email = p.email AND p2.organization_id = p.organization_id
+    ) > 1;
+
+
 -- =============================================================================
 -- 7. FUNCTIONS                                  [HARDENED]
 -- =============================================================================
@@ -783,9 +905,10 @@ REVOKE ALL ON TABLE public.waitlist_items      FROM anon;
 REVOKE ALL ON TABLE public.tasks               FROM anon;
 REVOKE ALL ON TABLE public.user_profiles       FROM anon;
 REVOKE ALL ON TABLE public.rate_limit_log      FROM anon;
-REVOKE ALL ON TABLE public.user_profiles_view  FROM anon;
-REVOKE ALL ON TABLE public.waitlist_items_view FROM anon;
-REVOKE ALL ON TABLE public.waitlist_tasks_view FROM anon;
+REVOKE ALL ON TABLE public.user_profiles_view      FROM anon;
+REVOKE ALL ON TABLE public.waitlist_items_view     FROM anon;
+REVOKE ALL ON TABLE public.waitlist_tasks_view     FROM anon;
+REVOKE ALL ON TABLE public.data_integrity_issues   FROM anon;
 
 -- Revoke PUBLIC execute on all internal/trigger functions so that anon and
 -- authenticated don't inherit it. (PostgreSQL grants EXECUTE to PUBLIC by
@@ -812,9 +935,10 @@ GRANT ALL ON TABLE public.waitlist_items      TO authenticated;
 GRANT ALL ON TABLE public.tasks               TO authenticated;
 GRANT ALL ON TABLE public.user_profiles       TO authenticated;
 GRANT ALL ON TABLE public.rate_limit_log      TO authenticated;
-GRANT ALL ON TABLE public.user_profiles_view  TO authenticated;
-GRANT ALL ON TABLE public.waitlist_items_view TO authenticated;
-GRANT ALL ON TABLE public.waitlist_tasks_view TO authenticated;
+GRANT ALL ON TABLE public.user_profiles_view      TO authenticated;
+GRANT ALL ON TABLE public.waitlist_items_view     TO authenticated;
+GRANT ALL ON TABLE public.waitlist_tasks_view     TO authenticated;
+GRANT SELECT ON TABLE public.data_integrity_issues TO authenticated; -- read-only diagnostic
 
 -- Re-grant to authenticated only what the app actually needs:
 --   current_user_org/role  — called by every RLS policy expression
@@ -930,6 +1054,14 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text)     TO authenticated;
 --             (it was recreated without security_invoker = true in the previous
 --             migration). Fixed with ALTER VIEW ... SET (security_invoker = on).
 --             Reference schema updated to match.
+-- 2026-05-27  Phase 1 prep — documented data_integrity_issues view:
+--             [1] Captured live view definition and added to this schema file.
+--             [2] View was missing from schema file (known gap, noted in PROJECT.md).
+--             [3] Noted security issue: view lacks security_invoker = true.
+--                 Will be fixed in Phase 1.3 alongside wl_ table rename migration.
+--             [4] References un-prefixed tables (families, parents, children,
+--                 waitlist_items) — must be recreated in Phase 1.3.
+--
 -- 2026-05-26  Task name — moved from stored column to live view computation:
 --             [1] Dropped tasks.name column (was a denormalized snapshot prone
 --                 to going stale if child name or term changed).

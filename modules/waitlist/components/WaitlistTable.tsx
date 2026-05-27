@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
+import type { WaitlistItem, SchoolTerm } from "@/modules/waitlist/types";
 import { ChildDetailPanel } from "./ChildDetailPanel";
 import { AddChildModal } from "./AddChildModal";
 

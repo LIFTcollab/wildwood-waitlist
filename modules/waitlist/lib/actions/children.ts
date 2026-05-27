@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { WaitlistItem } from "@/lib/types/waitlist";
+import type { WaitlistItem } from "@/modules/waitlist/types";
 
 export type CreateWaitlistEntryInput = {
   // Family — provide familyId for existing, familyName for new

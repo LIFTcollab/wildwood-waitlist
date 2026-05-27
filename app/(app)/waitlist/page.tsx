@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { WaitlistTable } from "@/components/dashboard/WaitlistTable";
+import { WaitlistTable } from "@/modules/waitlist/components/WaitlistTable";
 
 export const metadata = { title: "Waitlist — Wildwood" };
 

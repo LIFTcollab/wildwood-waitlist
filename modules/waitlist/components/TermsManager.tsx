@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createTerm, updateTerm, type TermInput } from "@/app/actions/terms";
-import type { SchoolTerm } from "@/lib/types/waitlist";
+import { createTerm, updateTerm, type TermInput } from "@/modules/waitlist/lib/actions/terms";
+import type { SchoolTerm } from "@/modules/waitlist/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

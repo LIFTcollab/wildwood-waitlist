@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { createWaitlistEntry } from "@/app/actions/children";
-import type { WaitlistItem, SchoolTerm } from "@/lib/types/waitlist";
+import { createWaitlistEntry } from "@/modules/waitlist/lib/actions/children";
+import type { WaitlistItem, SchoolTerm } from "@/modules/waitlist/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

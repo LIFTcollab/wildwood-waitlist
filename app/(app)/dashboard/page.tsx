@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { TermChartGrid } from "@/components/dashboard/TermChartGrid";
-import type { TermChartData } from "@/components/dashboard/TermChartGrid";
-import { OpenTasksTable } from "@/components/dashboard/OpenTasksTable";
-import type { TaskRow } from "@/components/dashboard/OpenTasksTable";
+import { TermChartGrid } from "@/modules/waitlist/components/TermChartGrid";
+import type { TermChartData } from "@/modules/waitlist/components/TermChartGrid";
+import { OpenTasksTable } from "@/modules/waitlist/components/OpenTasksTable";
+import type { TaskRow } from "@/modules/waitlist/components/OpenTasksTable";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

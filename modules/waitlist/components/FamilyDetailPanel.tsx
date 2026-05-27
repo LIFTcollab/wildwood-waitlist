@@ -9,7 +9,7 @@ import {
   moveChildToFamily,
   moveParentToFamily,
   type ParentData,
-} from "@/app/actions/families";
+} from "@/modules/waitlist/lib/actions/families";
 import type { FamilyRow } from "./FamiliesTable";
 import { PriorityPill } from "./WaitlistTable";
 

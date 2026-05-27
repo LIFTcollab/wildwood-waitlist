@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import SignOutButton from "@/components/dashboard/SignOutButton";
-import { TopNav } from "@/components/dashboard/TopNav";
+import SignOutButton from "@/modules/waitlist/components/SignOutButton";
+import { TopNav } from "@/modules/waitlist/components/TopNav";
 
 export default async function DashboardLayout({
   children,
