@@ -15,7 +15,8 @@ export type WaitlistItem = {
   status: string | null;
   classroom: string | null;
   date_applied: string | null;
-  notes: string | null;
+  notes: string | null;        // waitlist entry notes
+  child_notes: string | null;  // notes on the child record (children.notes)
   created_at: string;
 };
 

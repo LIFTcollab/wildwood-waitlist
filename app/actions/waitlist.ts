@@ -4,14 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export type WaitlistItemUpdate = {
-  first_name: string;
-  last_name: string;
-  dob: string | null;
-  status: string | null;
-  classroom: string | null;
-  term_id: string;
+  first_name:  string;
+  last_name:   string;
+  dob:         string | null;
+  status:      string | null;
+  classroom:   string | null;
+  term_id:     string;
   date_applied: string | null;
-  notes: string | null;
+  notes:       string | null;  // waitlist entry notes
+  child_notes: string | null;  // children.notes
 };
 
 export async function updateWaitlistItem(

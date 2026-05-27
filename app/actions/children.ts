@@ -96,7 +96,7 @@ export async function createWaitlistEntry(
     .from("waitlist_items_view")
     .select(
       "id, child_id, child_full_name, first_name, last_name, dob, " +
-      "priority_status, priority_rank, term_name, term_id, status, " +
+      "priority_status, priority_rank, term_name, term_id, status, child_notes, " +
       "classroom, date_applied, notes, created_at"
     )
     .eq("id", wi.id)
@@ -122,8 +122,9 @@ export async function createWaitlistEntry(
       status:          input.status ?? "Waitlisted",
       classroom:       input.classroom ?? null,
       date_applied:    input.dateApplied ? `${input.dateApplied}-01` : null,
-      notes:           input.notes ?? null,
-      created_at:      new Date().toISOString(),
+      notes:       input.notes ?? null,
+      child_notes: null,
+      created_at:  new Date().toISOString(),
     };
     return { error: null, item: fallback };
   }

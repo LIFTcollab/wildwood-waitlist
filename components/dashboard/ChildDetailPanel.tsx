@@ -86,14 +86,15 @@ const selectStyle = {
 // ─── Form state type ──────────────────────────────────────────────────────────
 
 type FormData = {
-  first_name: string;
-  last_name: string;
-  dob: string;
-  status: string;
-  classroom: string;
-  term_id: string;
+  first_name:  string;
+  last_name:   string;
+  dob:         string;
+  status:      string;
+  classroom:   string;
+  term_id:     string;
   date_applied: string;
-  notes: string;
+  notes:       string;  // waitlist entry notes
+  child_notes: string;  // children.notes
 };
 
 function itemToForm(item: WaitlistItem): FormData {
@@ -106,6 +107,7 @@ function itemToForm(item: WaitlistItem): FormData {
     term_id:      item.term_id ?? "",
     date_applied: item.date_applied ? item.date_applied.slice(0, 7) : "",
     notes:        item.notes ?? "",
+    child_notes:  item.child_notes ?? "",
   };
 }
 
@@ -231,6 +233,7 @@ export function ChildDetailPanel({
       term_id:      form.term_id,
       date_applied: form.date_applied ? form.date_applied + "-01" : null,
       notes:        form.notes || null,
+      child_notes:  form.child_notes || null,
     });
 
     if (result.error) {
@@ -254,7 +257,8 @@ export function ChildDetailPanel({
       term_id:         form.term_id,
       term_name:       termName ?? null,
       date_applied:    form.date_applied ? form.date_applied + "-01" : null,
-      notes:           form.notes || null,
+      notes:       form.notes || null,
+      child_notes: form.child_notes || null,
     };
 
     onSave(updated);
@@ -514,14 +518,33 @@ export function ChildDetailPanel({
             )}
           </Field>
 
-          {/* Notes */}
-          <Field label="Notes">
+          {/* Child notes (children.notes — persists across all terms) */}
+          <Field label="Child record notes">
+            {isEditing ? (
+              <textarea
+                value={form.child_notes}
+                onChange={set("child_notes")}
+                rows={3}
+                placeholder="Notes about this child (not term-specific)…"
+                className={inputCls + " resize-none leading-relaxed"}
+              />
+            ) : item.child_notes ? (
+              <p className="text-[13.5px] text-text-2 leading-relaxed whitespace-pre-wrap">
+                {item.child_notes}
+              </p>
+            ) : (
+              <p className="text-[13.5px] text-text-3 italic">None</p>
+            )}
+          </Field>
+
+          {/* Entry notes (waitlist_items.notes — specific to this term entry) */}
+          <Field label="Entry notes">
             {isEditing ? (
               <textarea
                 value={form.notes}
                 onChange={set("notes")}
-                rows={4}
-                placeholder="Add notes…"
+                rows={3}
+                placeholder="Notes about this waitlist entry…"
                 className={inputCls + " resize-none leading-relaxed"}
               />
             ) : item.notes ? (
@@ -529,7 +552,7 @@ export function ChildDetailPanel({
                 {item.notes}
               </p>
             ) : (
-              <p className="text-[13.5px] text-text-3 italic">No notes</p>
+              <p className="text-[13.5px] text-text-3 italic">None</p>
             )}
           </Field>
 

@@ -15,7 +15,7 @@ export default async function ChildrenPage() {
       supabase
         .from("waitlist_items_view")
         .select(
-          "id, child_id, child_full_name, first_name, last_name, dob, priority_status, priority_rank, term_name, term_id, status, classroom, date_applied, notes, created_at"
+          "id, child_id, child_full_name, first_name, last_name, dob, priority_status, priority_rank, term_name, term_id, status, classroom, date_applied, notes, child_notes, created_at"
         )
         .order("priority_rank", { ascending: true, nullsFirst: false })
         .order("child_full_name", { ascending: true }),
