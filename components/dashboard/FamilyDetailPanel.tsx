@@ -56,7 +56,7 @@ type ParentForm = {
   email:           string;
   phone:           string;
   primary_contact: boolean;
-  school_history:  string;   // "" | "Teacher" | "Alumni"
+  school_history:  string;   // "" | "Board" | "Teacher" | "Alumni"
 };
 
 type FamilyForm = {
@@ -432,7 +432,7 @@ export function FamilyDetailPanel({
       email:           p.email.trim() || null,
       phone:           p.phone.trim() || null,
       primary_contact: p.primary_contact,
-      school_history:  (p.school_history as "Teacher" | "Alumni") || null,
+      school_history:  (p.school_history as "Board" | "Teacher" | "Alumni") || null,
     }));
 
     const updatedFamily: FamilyDetail = {
