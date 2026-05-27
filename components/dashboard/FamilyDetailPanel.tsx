@@ -8,6 +8,7 @@ import {
   addParent,
   deleteParent,
   moveChildToFamily,
+  moveParentToFamily,
   type ParentData,
 } from "@/app/actions/families";
 import type { FamilyRow } from "./FamiliesTable";
@@ -149,14 +150,22 @@ export function FamilyDetailPanel({
   const [confirmKey, setConfirmKey] = useState<string | null>(null); // parent _key pending remove
   const [removeErr,  setRemoveErr]  = useState<string | null>(null);
 
-  // ── Move child state ───────────────────────────────────────────────────────
+  // ── Move child / parent shared state ──────────────────────────────────────
   type FamilyOption = { id: string; name: string };
-  const [movingChildId,   setMovingChildId]   = useState<string | null>(null);
-  const [familySearch,    setFamilySearch]    = useState("");
   const [allFamilies,     setAllFamilies]     = useState<FamilyOption[]>([]);
   const [familiesLoaded,  setFamiliesLoaded]  = useState(false);
+
+  // Move child
+  const [movingChildId,   setMovingChildId]   = useState<string | null>(null);
+  const [familySearch,    setFamilySearch]    = useState("");
   const [moving,          setMoving]          = useState(false);
   const [moveError,       setMoveError]       = useState<string | null>(null);
+
+  // Move parent
+  const [movingParentKey,    setMovingParentKey]    = useState<string | null>(null);
+  const [parentFamilySearch, setParentFamilySearch] = useState("");
+  const [parentMoving,       setParentMoving]       = useState(false);
+  const [parentMoveError,    setParentMoveError]    = useState<string | null>(null);
 
   // Fetch full family detail whenever the panel opens
   useEffect(() => {
@@ -345,21 +354,71 @@ export function FamilyDetailPanel({
     setMovingChildId(null);
     setFamilySearch("");
     setMoveError(null);
+    setMovingParentKey(null);
+    setParentFamilySearch("");
+    setParentMoveError(null);
+  }
+
+  async function loadFamilies() {
+    if (familiesLoaded) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("families")
+      .select("id, name")
+      .order("name");
+    setAllFamilies((data ?? []) as FamilyOption[]);
+    setFamiliesLoaded(true);
   }
 
   async function openMoveChild(childId: string) {
     setMovingChildId(childId);
     setFamilySearch("");
     setMoveError(null);
-    // Load families once, lazily
-    if (!familiesLoaded) {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("families")
-        .select("id, name")
-        .order("name");
-      setAllFamilies((data ?? []) as FamilyOption[]);
-      setFamiliesLoaded(true);
+    await loadFamilies();
+  }
+
+  async function openMoveParent(parentKey: string) {
+    setMovingParentKey(parentKey);
+    setParentFamilySearch("");
+    setParentMoveError(null);
+    await loadFamilies();
+  }
+
+  async function handleMoveParent(targetFamilyId: string, parentKey: string) {
+    const parent = form.parents.find((p) => p._key === parentKey);
+    if (!parent?.id) return;
+    setParentMoving(true);
+    setParentMoveError(null);
+    const result = await moveParentToFamily(parent.id, targetFamilyId);
+    if (result.error) {
+      setParentMoveError(result.error);
+      setParentMoving(false);
+      return;
+    }
+    // Remove from local family + form state
+    const remaining = family
+      ? family.parents.filter((fp) => fp.id !== parent.id)
+      : [];
+    setFamily((prev) =>
+      prev ? { ...prev, parents: prev.parents.filter((fp) => fp.id !== parent.id) } : prev
+    );
+    setForm((prev) => ({
+      ...prev,
+      parents: prev.parents.filter((fp) => fp._key !== parentKey),
+    }));
+    setMovingParentKey(null);
+    setParentFamilySearch("");
+    setParentMoving(false);
+    if (family) {
+      onUpdate(family.id, {
+        name:    family.name,
+        parents: remaining.map((fp) => ({
+          id:              fp.id,
+          first_name:      fp.first_name,
+          last_name:       fp.last_name,
+          primary_contact: fp.primary_contact,
+        })),
+      });
     }
   }
 
@@ -592,7 +651,7 @@ export function FamilyDetailPanel({
                             className={inputCls}
                           />
 
-                          {/* Bottom row: primary contact + school history + remove */}
+                          {/* Bottom row: primary contact + school history + move + remove */}
                           <div className="flex items-center gap-3 pt-0.5">
                             <label className="flex items-center gap-1.5 cursor-pointer select-none">
                               <div
@@ -634,6 +693,16 @@ export function FamilyDetailPanel({
                               <option value="Alumni">Alumni</option>
                             </select>
 
+                            {/* Move (saved parents only) */}
+                            {p.id !== null && confirmKey !== p._key && movingParentKey !== p._key && (
+                              <button
+                                onClick={() => openMoveParent(p._key)}
+                                className="flex-shrink-0 text-[12px] text-text-3 hover:text-text-2 underline underline-offset-2 transition-colors"
+                              >
+                                Move
+                              </button>
+                            )}
+
                             {/* Remove / confirm */}
                             {confirmKey === p._key ? (
                               <div className="flex items-center gap-2 flex-shrink-0">
@@ -652,14 +721,79 @@ export function FamilyDetailPanel({
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => setConfirmKey(p._key)}
-                                className="flex-shrink-0 text-[12px] text-text-3 hover:text-terra transition-colors"
-                              >
-                                Remove
-                              </button>
+                              movingParentKey !== p._key && (
+                                <button
+                                  onClick={() => setConfirmKey(p._key)}
+                                  className="flex-shrink-0 text-[12px] text-text-3 hover:text-terra transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              )
                             )}
                           </div>
+                          {/* Inline family picker for parent move */}
+                          {movingParentKey === p._key && (
+                            <div className="mt-3 rounded-xl border border-border bg-surface-warm p-3 space-y-2">
+                              {form.parents.length === 1 && (
+                                <p className="text-[11.5px] text-gold font-medium">
+                                  ⚠ This is the only parent in this family.
+                                </p>
+                              )}
+                              <p className="text-[11.5px] text-text-3">Move to which family?</p>
+                              <div className="relative">
+                                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-3 pointer-events-none" viewBox="0 0 16 16" fill="none">
+                                  <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
+                                  <path d="m10.5 10.5 3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  placeholder="Search families…"
+                                  value={parentFamilySearch}
+                                  onChange={(e) => setParentFamilySearch(e.target.value)}
+                                  className={inputCls + " pl-8 text-[12.5px]"}
+                                />
+                              </div>
+                              <div className="max-h-[180px] overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                                {allFamilies
+                                  .filter(
+                                    (f) =>
+                                      f.id !== family?.id &&
+                                      (!parentFamilySearch.trim() ||
+                                        f.name.toLowerCase().includes(parentFamilySearch.toLowerCase()))
+                                  )
+                                  .map((f) => (
+                                    <button
+                                      key={f.id}
+                                      onClick={() => handleMoveParent(f.id, p._key)}
+                                      disabled={parentMoving}
+                                      className="w-full text-left px-3 py-2 text-[13px] text-text hover:bg-surface-hover transition-colors disabled:opacity-50"
+                                    >
+                                      {f.name}
+                                    </button>
+                                  ))}
+                                {allFamilies.filter(
+                                  (f) =>
+                                    f.id !== family?.id &&
+                                    (!parentFamilySearch.trim() ||
+                                      f.name.toLowerCase().includes(parentFamilySearch.toLowerCase()))
+                                ).length === 0 && (
+                                  <p className="px-3 py-2 text-[12.5px] text-text-3 italic">
+                                    {familiesLoaded ? "No families found." : "Loading…"}
+                                  </p>
+                                )}
+                              </div>
+                              {parentMoveError && (
+                                <p className="text-[12px] text-terra">{parentMoveError}</p>
+                              )}
+                              <button
+                                onClick={() => { setMovingParentKey(null); setParentFamilySearch(""); setParentMoveError(null); }}
+                                className="text-[12px] text-text-3 hover:text-text transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))
                     : family?.parents.map((p) => (
