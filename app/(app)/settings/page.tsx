@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { TermsManager } from "@/components/dashboard/TermsManager";
+import { DataIntegrityPanel } from "@/components/dashboard/DataIntegrityPanel";
 import type { SchoolTerm } from "@/lib/types/waitlist";
 
 export default async function SettingsPage() {
@@ -51,6 +52,20 @@ export default async function SettingsPage() {
         </div>
 
         <TermsManager initialTerms={terms} canEdit={canEdit} />
+      </section>
+
+      {/* Data integrity section */}
+      <section className="border-t border-border pt-8">
+        <div className="mb-4">
+          <h2 className="font-serif text-[18px] font-medium text-text">
+            Data integrity
+          </h2>
+          <p className="text-[12.5px] text-text-3 mt-0.5">
+            Checks families, parents, and children for missing links and inconsistencies.
+          </p>
+        </div>
+
+        <DataIntegrityPanel />
       </section>
     </div>
   );
