@@ -94,7 +94,9 @@ CREATE TABLE public.families (
   legacy_id       text,
   name            text NOT NULL,
   organization_id uuid REFERENCES public.organizations(id),
-  created_at      timestamptz DEFAULT now()
+  created_at      timestamptz DEFAULT now(),
+  priority_rank   integer DEFAULT 5,           -- [UPDATED] moved from children; default 5 = Regular
+  priority_status text    DEFAULT 'Regular'    -- [UPDATED] moved from children; plain text not enum
 );
 
 CREATE TABLE public.children (
@@ -103,11 +105,11 @@ CREATE TABLE public.children (
   first_name      text NOT NULL,
   last_name       text NOT NULL,
   dob             date,
-  priority_status public.priority_status_enum,
   notes           text,
   family_id       uuid REFERENCES public.families(id),
   organization_id uuid REFERENCES public.organizations(id),
   created_at      timestamptz DEFAULT now()
+  -- priority_status removed: moved to families table
 );
 
 CREATE TABLE public.parents (
@@ -232,89 +234,75 @@ AS
 
 
 -- waitlist_items_view
--- Denormalized view of waitlist_items joined with children and school_terms.
--- Primary data source for the staff waitlist UI.
--- SECURITY INVOKER so RLS policies are enforced for the calling user.
--- term_name is plain text (no enum cast) so any new term name is immediately
--- visible without requiring an ALTER TYPE migration.
+-- Denormalized view: waitlist_items → children → families → school_terms.
+-- priority_status and priority_rank come from families (moved from children).
+-- child_notes is children.notes exposed under an alias for the inline editor.
+-- term_name is plain text — no enum cast needed for new terms.
 CREATE VIEW public.waitlist_items_view
-WITH (security_invoker = true)               -- [HARDENED] explicit invoker semantics
+WITH (security_invoker = true)
 AS
   SELECT
     wi.id,
-    wi.status                            AS status,
-    wi.classroom                         AS classroom,
-    wi.date_applied                      AS date_applied,
-    wi.notes                             AS notes,
+    wi.status,
+    wi.classroom,
+    wi.date_applied,
+    wi.notes,
     wi.created_at,
     wi.child_id,
     wi.term_id,
     wi.organization_id,
-    c.dob                                AS dob,
-    c.first_name                         AS first_name,
-    c.last_name                          AS last_name,
+    c.dob,
+    c.first_name,
+    c.last_name,
     (c.first_name || ' ' || c.last_name) AS child_full_name,
-    c.priority_status                    AS priority_status,
-    CASE c.priority_status
-      WHEN 'Board'    THEN 1
-      WHEN 'Teacher'  THEN 2
-      WHEN 'Alumni'   THEN 3
-      WHEN 'Sibling'  THEN 4
-      WHEN 'Regular'  THEN 5
-      ELSE NULL
-    END                                  AS priority_rank,
-    st.name                              AS term_name,
-    st.start_date                        AS term_start_date,
-    st.end_date                          AS term_end_date,
-    st.status                            AS term_status
+    c.notes                               AS child_notes,
+    f.priority_status,
+    f.priority_rank,
+    st.name                               AS term_name,
+    st.start_date                         AS term_start_date,
+    st.end_date                           AS term_end_date,
+    st.status                             AS term_status
   FROM public.waitlist_items wi
-  JOIN public.children c      ON wi.child_id = c.id
-  JOIN public.school_terms st ON wi.term_id  = st.id;
+  JOIN public.children c      ON c.id  = wi.child_id
+  JOIN public.families f      ON f.id  = c.family_id
+  JOIN public.school_terms st ON st.id = wi.term_id;
 
 
 -- waitlist_tasks_view
 -- task_name is computed live as "<first> <last>: <term>" — never stored.
--- Always current even if child name or term changes.
--- SECURITY INVOKER so RLS policies are enforced for the calling user.
-CREATE OR REPLACE VIEW public.waitlist_tasks_view
-WITH (security_invoker = true)               -- [HARDENED] explicit invoker semantics
+-- priority_status and priority_rank come from families (moved from children).
+CREATE VIEW public.waitlist_tasks_view
+WITH (security_invoker = true)
 AS
   SELECT
-    t.id                                                      AS task_id,
-    (c.first_name || ' ' || c.last_name || ': ' || st.name)  AS task_name,
-    t.status                                                  AS task_status,
-    t.description                                             AS task_description,
-    wi.id                                                     AS waitlist_item_id,
-    wi.status                             AS waitlist_status,
+    t.id                                                     AS task_id,
+    (c.first_name || ' ' || c.last_name || ': ' || st.name) AS task_name,
+    t.status                                                 AS task_status,
+    t.description                                            AS task_description,
+    wi.id                                                    AS waitlist_item_id,
+    wi.status                                                AS waitlist_status,
     wi.classroom,
     wi.date_applied,
-    wi.notes                              AS waitlist_notes,
-    c.id                                  AS child_id,
-    c.first_name                          AS child_first_name,
-    c.last_name                           AS child_last_name,
-    (c.first_name || ' ' || c.last_name)  AS child_full_name,
-    c.dob                                 AS child_dob,
-    c.priority_status                     AS child_priority_status,
-    CASE c.priority_status
-      WHEN 'Board'   THEN 1
-      WHEN 'Teacher' THEN 2
-      WHEN 'Alumni'  THEN 3
-      WHEN 'Sibling' THEN 4
-      WHEN 'Regular' THEN 5
-      ELSE NULL
-    END                                   AS priority_rank,
-    f.id                                  AS family_id,
-    f.name                                AS family_name,
-    st.id                                 AS term_id,
-    st.name                               AS term_name,
-    st.status                             AS term_status,
+    wi.notes                                                 AS waitlist_notes,
+    c.id                                                     AS child_id,
+    c.first_name                                             AS child_first_name,
+    c.last_name                                              AS child_last_name,
+    (c.first_name || ' ' || c.last_name)                     AS child_full_name,
+    c.dob                                                    AS child_dob,
+    f.priority_status                                        AS child_priority_status,
+    f.priority_rank,
+    f.id                                                     AS family_id,
+    f.name                                                   AS family_name,
+    st.id                                                    AS term_id,
+    st.name                                                  AS term_name,
+    st.status                                                AS term_status,
     wi.organization_id,
     t.created_at
   FROM public.tasks t
-  JOIN public.waitlist_items wi ON wi.id  = t.waitlist_item_id
-  JOIN public.children c        ON c.id   = wi.child_id
-  JOIN public.families f        ON f.id   = c.family_id
-  JOIN public.school_terms st   ON st.id  = wi.term_id;
+  JOIN public.waitlist_items wi ON wi.id = t.waitlist_item_id
+  JOIN public.children c        ON c.id  = wi.child_id
+  JOIN public.families f        ON f.id  = c.family_id
+  JOIN public.school_terms st   ON st.id = wi.term_id;
 
 
 -- data_integrity_issues
@@ -648,10 +636,10 @@ BEGIN
   WHERE id = NEW.id;
 
   UPDATE public.children SET
-    first_name      = NEW.first_name,
-    last_name       = NEW.last_name,
-    dob             = NEW.dob,
-    priority_status = NEW.priority_status
+    first_name = NEW.first_name,
+    last_name  = NEW.last_name,
+    dob        = NEW.dob,
+    notes      = NEW.child_notes  -- [UPDATED] priority_status removed (now on families)
   WHERE id = NEW.child_id;
 
   RETURN NEW;
@@ -1054,6 +1042,18 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text)     TO authenticated;
 --             (it was recreated without security_invoker = true in the previous
 --             migration). Fixed with ALTER VIEW ... SET (security_invoker = on).
 --             Reference schema updated to match.
+-- 2026-05-27  Schema file corrections — live DB had diverged from doc:
+--             [1] priority_status and priority_rank moved from children to
+--                 families. families now has: priority_status text DEFAULT 'Regular',
+--                 priority_rank integer DEFAULT 5.
+--             [2] children no longer has priority_status column.
+--             [3] waitlist_items_view updated: added families JOIN,
+--                 priority_status/rank now from families, added child_notes.
+--             [4] waitlist_tasks_view updated: priority_status/rank from families.
+--             [5] update_waitlist_items_view() updated: children UPDATE now sets
+--                 notes = NEW.child_notes instead of priority_status.
+--             These changes were made in the DB but not captured in this file.
+--
 -- 2026-05-27  Phase 1 prep — documented data_integrity_issues view:
 --             [1] Captured live view definition and added to this schema file.
 --             [2] View was missing from schema file (known gap, noted in PROJECT.md).
