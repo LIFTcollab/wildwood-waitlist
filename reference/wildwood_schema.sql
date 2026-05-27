@@ -66,6 +66,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 -- =============================================================================
 
 CREATE TYPE public.org_status_enum AS ENUM ('Active', 'Inactive');
+CREATE TYPE public.org_type_enum AS ENUM (   -- [Phase 1.4]
+  'nonprofit', 'business_sponsor', 'foundation',
+  'community_org', 'government', 'lift_internal'
+);
 CREATE TYPE public.priority_status_enum AS ENUM ('Board', 'Teacher', 'Alumni', 'Sibling', 'Regular');
 CREATE TYPE public.school_history_enum AS ENUM ('Teacher', 'Alumni');
 CREATE TYPE public.school_term_name_enum AS ENUM ('Fall 25-26', 'Fall 26-27', 'Fall 27-28', 'Fall 28-29', 'Fall 29-30');
@@ -85,6 +89,9 @@ CREATE TABLE public.organizations (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legacy_id   text,
   name        text NOT NULL,
+  slug        text UNIQUE NOT NULL,            -- [Phase 1.4] subdomain identifier
+  type        public.org_type_enum,            -- [Phase 1.4]
+  domain      text,                            -- [Phase 1.4] custom domain (future)
   status      public.org_status_enum,
   created_at  timestamptz DEFAULT now()
 );
@@ -1053,6 +1060,20 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text)     TO authenticated;
 --             [5] update_waitlist_items_view() updated: children UPDATE now sets
 --                 notes = NEW.child_notes instead of priority_status.
 --             These changes were made in the DB but not captured in this file.
+--
+-- 2026-05-27  Phase 1.4 — Added slug, type, domain to organizations:
+--             [1] Created org_type_enum with 6 values matching ARCHITECTURE.md.
+--             [2] Added slug (UNIQUE NOT NULL), type (org_type_enum), domain (nullable).
+--             [3] Seeded Wildwood School: slug='wildwood', type='nonprofit'.
+--             [4] Domain left NULL — populated when custom domains are configured (Phase 2).
+--
+-- 2026-05-27  Phase 1.3 — Renamed 6 waitlist tables to wl_ prefix:
+--             [1] families→wl_families, children→wl_children, parents→wl_parents,
+--                 school_terms→wl_school_terms, waitlist_items→wl_waitlist_items,
+--                 tasks→wl_tasks.
+--             [2] Recreated all 3 views with wl_ table names and security_invoker=true.
+--             [3] Created modules and organization_modules core tables; seeded
+--                 the waitlist module and Wildwood's enablement.
 --
 -- 2026-05-27  Phase 1 prep — documented data_integrity_issues view:
 --             [1] Captured live view definition and added to this schema file.
