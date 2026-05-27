@@ -188,7 +188,7 @@ export function FamilyDetailPanel({
       try {
         // Fetch family + parents + children in one round trip
         const { data: fam } = await supabase
-          .from("families")
+          .from("wl_families")
           .select(
             "id, name, organization_id, priority_status, " +
             "parents(id, first_name, last_name, email, phone, primary_contact, school_history), " +
@@ -371,7 +371,7 @@ export function FamilyDetailPanel({
     if (familiesLoaded) return;
     const supabase = createClient();
     const { data } = await supabase
-      .from("families")
+      .from("wl_families")
       .select("id, name")
       .order("name");
     setAllFamilies((data ?? []) as FamilyOption[]);

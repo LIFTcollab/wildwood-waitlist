@@ -47,7 +47,7 @@ export async function createTask(
   if (wiError || !wi) return { error: "Waitlist item not found", taskId: null, taskName: null };
 
   const { data, error } = await supabase
-    .from("tasks")
+    .from("wl_tasks")
     .insert({
       waitlist_item_id: waitlistItemId,
       organization_id:  wi.organization_id,

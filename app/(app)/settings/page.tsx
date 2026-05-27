@@ -16,7 +16,7 @@ export default async function SettingsPage() {
       .eq("id", user.id)
       .single(),
     supabase
-      .from("school_terms")
+      .from("wl_school_terms")
       .select("id, name, status, start_date, end_date, sort_order")
       .order("sort_order", { ascending: true, nullsFirst: false }),
   ]);

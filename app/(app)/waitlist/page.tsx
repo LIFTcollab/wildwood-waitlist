@@ -20,7 +20,7 @@ export default async function ChildrenPage() {
         .order("priority_rank", { ascending: true, nullsFirst: false })
         .order("child_full_name", { ascending: true }),
       supabase
-        .from("school_terms")
+        .from("wl_school_terms")
         .select("id, name, status, start_date, end_date, sort_order")
         .order("sort_order", { ascending: true }),
       user
@@ -31,7 +31,7 @@ export default async function ChildrenPage() {
             .single()
         : Promise.resolve({ data: null, error: null }),
       supabase
-        .from("tasks")
+        .from("wl_tasks")
         .select("waitlist_item_id")
         .in("status", ["To Do", "Doing"])
         .not("waitlist_item_id", "is", null),

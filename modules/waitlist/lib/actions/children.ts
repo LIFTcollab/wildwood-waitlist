@@ -48,7 +48,7 @@ export async function createWaitlistEntry(
   let familyId = input.familyId;
   if (!familyId) {
     const { data: fam, error: famErr } = await supabase
-      .from("families")
+      .from("wl_families")
       .insert({ name: input.familyName!.trim(), organization_id: orgId })
       .select("id")
       .single();
@@ -59,7 +59,7 @@ export async function createWaitlistEntry(
 
   // ── 2. Create child ───────────────────────────────────────────────────────
   const { data: child, error: childErr } = await supabase
-    .from("children")
+    .from("wl_children")
     .insert({
       first_name:      input.firstName.trim(),
       last_name:       input.lastName.trim(),
@@ -75,7 +75,7 @@ export async function createWaitlistEntry(
 
   // ── 3. Create waitlist item ───────────────────────────────────────────────
   const { data: wi, error: wiErr } = await supabase
-    .from("waitlist_items")
+    .from("wl_waitlist_items")
     .insert({
       child_id:        child.id,
       term_id:         input.termId,

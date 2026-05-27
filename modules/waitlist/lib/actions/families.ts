@@ -18,7 +18,7 @@ export async function updateFamilyName(
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase
-    .from("families")
+    .from("wl_families")
     .update({ name })
     .eq("id", id);
   if (error) return { error: error.message };
@@ -32,7 +32,7 @@ export async function updateParent(
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase
-    .from("parents")
+    .from("wl_parents")
     .update(data)
     .eq("id", id);
   if (error) return { error: error.message };
@@ -47,7 +47,7 @@ export async function addParent(
 ): Promise<{ error: string | null; id: string | null }> {
   const supabase = await createClient();
   const { data: result, error } = await supabase
-    .from("parents")
+    .from("wl_parents")
     .insert({ family_id: familyId, organization_id: organizationId, ...data })
     .select("id")
     .single();
@@ -60,7 +60,7 @@ export async function deleteParent(
   id: string
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
-  const { error } = await supabase.from("parents").delete().eq("id", id);
+  const { error } = await supabase.from("wl_parents").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/families");
   return { error: null };
@@ -85,7 +85,7 @@ export async function moveParentToFamily(
     return { error: "Only Admins and Directors can reassign parents" };
 
   const { error } = await supabase
-    .from("parents")
+    .from("wl_parents")
     .update({ family_id: familyId })
     .eq("id", parentId);
 
@@ -114,7 +114,7 @@ export async function moveChildToFamily(
     return { error: "Only Admins and Directors can reassign children" };
 
   const { error } = await supabase
-    .from("children")
+    .from("wl_children")
     .update({ family_id: familyId })
     .eq("id", childId);
 

@@ -41,20 +41,20 @@ export default async function DashboardPage() {
     { data: taskRows },
   ] = await Promise.all([
     supabase
-      .from("school_terms")
+      .from("wl_school_terms")
       .select("id, name, sort_order, status")
       .order("sort_order", { ascending: true }),
-    supabase.from("waitlist_items").select("term_id, status"),
+    supabase.from("wl_waitlist_items").select("term_id, status"),
     supabase
-      .from("tasks")
+      .from("wl_tasks")
       .select("*", { count: "exact", head: true })
       .neq("status", "Done"),
     supabase
-      .from("tasks")
+      .from("wl_tasks")
       .select("*", { count: "exact", head: true })
       .eq("priority", "Urgent")
       .neq("status", "Done"),
-    supabase.from("families").select("*", { count: "exact", head: true }),
+    supabase.from("wl_families").select("*", { count: "exact", head: true }),
     supabase
       .from("waitlist_tasks_view")
       .select(

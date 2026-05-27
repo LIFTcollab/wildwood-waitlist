@@ -17,7 +17,7 @@ export default async function FamiliesPage({
 
   const [{ data: families, error }, { data: profile }] = await Promise.all([
     supabase
-      .from("families")
+      .from("wl_families")
       .select(
         "id, name, created_at, priority_status, priority_rank, children(id, first_name, last_name), parents(id, first_name, last_name, primary_contact)"
       )

@@ -165,7 +165,7 @@ export function ChildDetailPanel({
     (async () => {
       try {
         const { data } = await supabase
-          .from("children")
+          .from("wl_children")
           .select("families(id, name, parents(id, first_name, last_name, primary_contact), children(id, first_name, last_name))")
           .eq("id", item.child_id)
           .single();
@@ -284,7 +284,7 @@ export function ChildDetailPanel({
     );
     const supabase = createClient();
     const { error } = await supabase
-      .from("tasks")
+      .from("wl_tasks")
       .update({ status: nextStatus })
       .eq("id", taskId);
     if (error) {
@@ -341,7 +341,7 @@ export function ChildDetailPanel({
     setEditingText("");
     const supabase = createClient();
     const { error } = await supabase
-      .from("tasks")
+      .from("wl_tasks")
       .update({ description: trimmed })
       .eq("id", taskId);
     if (error) {

@@ -32,7 +32,7 @@ export async function createTerm(
     return { error: "Only Admins and Directors can manage terms", term: null };
 
   const { data: term, error } = await supabase
-    .from("school_terms")
+    .from("wl_school_terms")
     .insert({
       name:            input.name.trim(),
       status:          input.status || null,
@@ -71,7 +71,7 @@ export async function updateTerm(
     return { error: "Only Admins and Directors can manage terms" };
 
   const { error } = await supabase
-    .from("school_terms")
+    .from("wl_school_terms")
     .update({
       name:       input.name.trim(),
       status:     input.status || null,
