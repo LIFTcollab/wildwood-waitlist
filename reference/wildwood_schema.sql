@@ -712,6 +712,102 @@ END;
 $$;
 
 
+-- Priority / name auto-recompute helpers (called by triggers)     [Phase 1 fix]
+-- These were NOT in the original schema file and were missed in phase1_wl_prefix.
+-- Fixed in migration phase1_fix_trigger_functions.sql.
+
+CREATE OR REPLACE FUNCTION public.fn_recompute_family_priority(p_family_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_prank integer;
+BEGIN
+  SELECT
+    CASE
+      WHEN EXISTS (SELECT 1 FROM public.wl_parents p WHERE p.family_id = p_family_id AND p.school_history::text = 'Board')   THEN 1
+      WHEN EXISTS (SELECT 1 FROM public.wl_parents p WHERE p.family_id = p_family_id AND p.school_history::text = 'Teacher') THEN 2
+      WHEN EXISTS (SELECT 1 FROM public.wl_parents p WHERE p.family_id = p_family_id AND p.school_history::text = 'Alumni')  THEN 3
+      WHEN (SELECT COUNT(DISTINCT sib.id) FROM public.wl_children sib
+            JOIN public.wl_waitlist_items wi ON wi.child_id = sib.id
+            WHERE sib.family_id = p_family_id
+              AND wi.status::text = ANY(ARRAY['Enrolled','Waitlisted'])) > 1  THEN 4
+      ELSE 5
+    END INTO v_prank;
+  UPDATE public.wl_families
+     SET priority_rank   = v_prank,
+         priority_status = CASE v_prank WHEN 1 THEN 'Board' WHEN 2 THEN 'Teacher'
+                                        WHEN 3 THEN 'Alumni' WHEN 4 THEN 'Sibling'
+                                        ELSE 'Regular' END
+   WHERE id = p_family_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_recompute_family_name(p_family_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_name text;
+BEGIN
+  SELECT string_agg(last_name, '-' ORDER BY last_name) INTO v_name
+  FROM (SELECT DISTINCT last_name FROM public.wl_parents
+        WHERE family_id = p_family_id AND last_name IS NOT NULL AND last_name <> '') t;
+  IF v_name IS NOT NULL AND v_name <> '' THEN
+    UPDATE public.wl_families SET name = v_name WHERE id = p_family_id;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_trg_parents_priority()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN PERFORM public.fn_recompute_family_priority(OLD.family_id);
+  ELSIF TG_OP = 'INSERT' THEN PERFORM public.fn_recompute_family_priority(NEW.family_id);
+  ELSE
+    IF OLD.family_id IS DISTINCT FROM NEW.family_id THEN
+      PERFORM public.fn_recompute_family_priority(OLD.family_id);
+    END IF;
+    PERFORM public.fn_recompute_family_priority(NEW.family_id);
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_trg_parents_family_name()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN PERFORM public.fn_recompute_family_name(OLD.family_id);
+  ELSIF TG_OP = 'INSERT' THEN PERFORM public.fn_recompute_family_name(NEW.family_id);
+  ELSE
+    IF OLD.last_name IS DISTINCT FROM NEW.last_name OR OLD.family_id IS DISTINCT FROM NEW.family_id THEN
+      IF OLD.family_id IS DISTINCT FROM NEW.family_id THEN PERFORM public.fn_recompute_family_name(OLD.family_id); END IF;
+      PERFORM public.fn_recompute_family_name(NEW.family_id);
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_trg_children_family_priority()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF OLD.family_id IS DISTINCT FROM NEW.family_id THEN
+    PERFORM public.fn_recompute_family_priority(OLD.family_id);
+    PERFORM public.fn_recompute_family_priority(NEW.family_id);
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_trg_waitlist_items_priority()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_family_id uuid;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    SELECT family_id INTO v_family_id FROM public.wl_children WHERE id = OLD.child_id;
+  ELSE
+    SELECT family_id INTO v_family_id FROM public.wl_children WHERE id = NEW.child_id;
+  END IF;
+  IF v_family_id IS NOT NULL THEN PERFORM public.fn_recompute_family_priority(v_family_id); END IF;
+  RETURN NULL;
+END;
+$$;
+
 -- =============================================================================
 -- 8. TRIGGERS
 -- =============================================================================
@@ -730,6 +826,24 @@ CREATE TRIGGER trg_update_task_from_view
   INSTEAD OF UPDATE ON public.waitlist_tasks_view
   FOR EACH ROW
   EXECUTE FUNCTION public.fn_update_task_from_view();
+
+-- Priority / name auto-recompute triggers (wl_ tables)    [Phase 1 fix]
+
+CREATE TRIGGER trg_parents_priority
+  AFTER INSERT OR UPDATE OR DELETE ON public.wl_parents
+  FOR EACH ROW EXECUTE FUNCTION public.fn_trg_parents_priority();
+
+CREATE TRIGGER trg_parents_family_name
+  AFTER INSERT OR UPDATE OR DELETE ON public.wl_parents
+  FOR EACH ROW EXECUTE FUNCTION public.fn_trg_parents_family_name();
+
+CREATE TRIGGER trg_children_family_priority
+  AFTER UPDATE ON public.wl_children
+  FOR EACH ROW EXECUTE FUNCTION public.fn_trg_children_family_priority();
+
+CREATE TRIGGER trg_waitlist_items_priority
+  AFTER INSERT OR UPDATE OR DELETE ON public.wl_waitlist_items
+  FOR EACH ROW EXECUTE FUNCTION public.fn_trg_waitlist_items_priority();
 
 CREATE EVENT TRIGGER ensure_rls
   ON ddl_command_end
@@ -1060,6 +1174,20 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text)     TO authenticated;
 --             [5] update_waitlist_items_view() updated: children UPDATE now sets
 --                 notes = NEW.child_notes instead of priority_status.
 --             These changes were made in the DB but not captured in this file.
+--
+-- 2026-05-27  Phase 1 fix — Trigger functions updated to wl_ table names:
+--             [1] fn_recompute_family_priority: was referencing public.parents,
+--                 public.children, public.waitlist_items, public.families.
+--                 Updated to wl_parents, wl_children, wl_waitlist_items, wl_families.
+--             [2] fn_recompute_family_name: was referencing public.parents,
+--                 public.families. Updated to wl_parents, wl_families.
+--             [3] fn_trg_waitlist_items_priority: was referencing public.children.
+--                 Updated to wl_children.
+--             [4] All 6 helper/trigger functions added to this schema file
+--                 (they were missing and therefore not updated in phase1_wl_prefix).
+--             Root cause: any UPDATE to wl_parents (e.g. school_history) triggered
+--             fn_trg_parents_priority → fn_recompute_family_priority, which failed
+--             with "relation public.parents does not exist", rolling back the UPDATE.
 --
 -- 2026-05-27  Phase 1.4 — Added slug, type, domain to organizations:
 --             [1] Created org_type_enum with 6 values matching ARCHITECTURE.md.
