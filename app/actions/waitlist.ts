@@ -51,8 +51,7 @@ export async function createTask(
       waitlist_item_id: waitlistItemId,
       organization_id:  wi.organization_id,
       description,
-      status:   "To Do",
-      priority: "Important",
+      status: "To Do",
     })
     .select("id")
     .single();
