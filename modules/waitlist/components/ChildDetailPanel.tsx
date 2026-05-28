@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import type { WaitlistItem, SchoolTerm } from "@/modules/waitlist/types";
 import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
 import { updateWaitlistItem, createTask } from "@/modules/waitlist/lib/actions/waitlist";
@@ -9,7 +8,15 @@ import { createClient } from "@/lib/supabase/client";
 
 // ─── Family info types (fetched on demand) ────────────────────────────────────
 
-type ParentInfo  = { id: string; first_name: string; last_name: string; primary_contact: boolean };
+type ParentInfo  = {
+  id:              string;
+  first_name:      string;
+  last_name:       string;
+  email:           string | null;
+  phone:           string | null;
+  primary_contact: boolean;
+  school_history:  "Board" | "Teacher" | "Alumni" | null;
+};
 type SiblingInfo = { id: string; first_name: string; last_name: string };
 type FamilyInfo  = { id: string; name: string; parents: ParentInfo[]; children: SiblingInfo[] };
 
@@ -166,7 +173,7 @@ export function ChildDetailPanel({
       try {
         const { data } = await supabase
           .from("wl_children")
-          .select("families:wl_families(id, name, parents:wl_parents(id, first_name, last_name, primary_contact), children:wl_children(id, first_name, last_name))")
+          .select("families:wl_families(id, name, parents:wl_parents(id, first_name, last_name, email, phone, primary_contact, school_history), children:wl_children(id, first_name, last_name))")
           .eq("id", item.child_id)
           .single();
         setFamilyInfo((data?.families as unknown as FamilyInfo) ?? null);
@@ -567,26 +574,16 @@ export function ChildDetailPanel({
               ) : familyInfo ? (
                 <>
                   <Field label="Family">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-serif text-[14px] font-medium text-text">
-                        {familyInfo.name || "—"}
-                      </p>
-                      {canEdit && (
-                        <Link
-                          href={`/families?open=${familyInfo.id}`}
-                          className="flex-shrink-0 text-[12px] text-green hover:text-green-deep font-medium transition-colors"
-                        >
-                          Edit family →
-                        </Link>
-                      )}
-                    </div>
+                    <p className="font-serif text-[14px] font-medium text-text">
+                      {familyInfo.name || "—"}
+                    </p>
                   </Field>
 
                   <Field label="Parents">
                     {familyInfo.parents.length === 0 ? (
                       <p className="text-[13px] text-text-3 italic">None on record</p>
                     ) : (
-                      <div className="space-y-1">
+                      <div className="space-y-3">
                         {[...familyInfo.parents]
                           .sort((a, b) => {
                             if (a.primary_contact !== b.primary_contact)
@@ -596,14 +593,33 @@ export function ChildDetailPanel({
                             );
                           })
                           .map((p) => (
-                            <div key={p.id} className="flex items-center gap-2">
-                              <span className="text-[13px] text-text-2">
-                                {p.first_name} {p.last_name}
-                              </span>
-                              {p.primary_contact && (
-                                <span className="font-mono text-[10px] text-text-3 uppercase tracking-wide">
-                                  primary
+                            <div key={p.id} className="space-y-0.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-serif text-[14px] font-medium text-text">
+                                  {p.first_name} {p.last_name}
                                 </span>
+                                {p.primary_contact && (
+                                  <span className="font-mono text-[10px] uppercase tracking-wide text-text-3">
+                                    primary
+                                  </span>
+                                )}
+                                {p.school_history && (
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium ${
+                                    p.school_history === "Board"
+                                      ? "bg-terra-soft text-terra"
+                                      : p.school_history === "Teacher"
+                                      ? "bg-green-soft text-green-deep"
+                                      : "bg-gold-soft text-gold"
+                                  }`}>
+                                    {p.school_history}
+                                  </span>
+                                )}
+                              </div>
+                              {p.email && (
+                                <p className="text-[12.5px] text-text-2">{p.email}</p>
+                              )}
+                              {p.phone && (
+                                <p className="font-mono text-[12px] text-text-2">{p.phone}</p>
                               )}
                             </div>
                           ))}
