@@ -752,9 +752,6 @@ export function FamilyDetailPanel({
                                     ? "bg-green border-green"
                                     : "border-border-strong bg-surface"
                                 }`}
-                                onClick={() =>
-                                  setParentField(p._key, "primary_contact", !p.primary_contact)
-                                }
                               >
                                 {p.primary_contact && (
                                   <svg viewBox="0 0 10 8" fill="none" className="w-2 h-2">
