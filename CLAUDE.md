@@ -57,34 +57,46 @@ I'm **Steve D'Amico** (steve@liftcollab.org). I'm comfortable editing config and
 ```
 wildwood-waitlist/
 ├── app/
-│   ├── (app)/                    # Protected — layout.tsx does auth check + nav
-│   │   ├── dashboard/page.tsx
-│   │   ├── waitlist/page.tsx
-│   │   ├── families/page.tsx
-│   │   └── settings/page.tsx
-│   ├── (public)/login/           # Magic link login form
-│   ├── actions/                  # Server Actions — all DB mutations live here
-│   │   ├── waitlist.ts           # updateWaitlistItem, createTask
-│   │   ├── children.ts           # createWaitlistEntry (3-step)
-│   │   ├── families.ts           # updateFamilyName, updateParent, addParent, deleteParent, moveParent/Child
-│   │   ├── tasks.ts              # updateTask
-│   │   ├── terms.ts              # createTerm, updateTerm
-│   │   └── integrity.ts          # checkDataIntegrity
-│   ├── auth/callback/route.ts    # Magic link exchange
-│   ├── layout.tsx                # Root — Google Fonts (Source Serif 4, Inter, JetBrains Mono)
-│   └── globals.css               # CSS custom properties + Tailwind v4 @theme
-├── components/dashboard/         # All UI components
-├── lib/
-│   ├── supabase/
-│   │   ├── client.ts             # Browser client
-│   │   └── server.ts             # Server client (cookies)
-│   └── types/waitlist.ts         # WaitlistItem, SchoolTerm types
-├── middleware.ts                 # Session refresh (every request)
+│   ├── (app)/                         # Protected routes — layout does auth check
+│   │   ├── layout.tsx                 # Auth guard, TopNav, user card
+│   │   ├── dashboard/page.tsx         # Stat cards + term charts + open tasks
+│   │   ├── waitlist/page.tsx          # WaitlistTable (server data fetch)
+│   │   ├── families/page.tsx          # Redirects to /settings
+│   │   └── settings/page.tsx          # Admin page: Families + Terms + DataIntegrity
+│   ├── (public)/login/                # Magic link login form
+│   ├── auth/callback/route.ts         # Magic link exchange → session → /dashboard
+│   ├── layout.tsx                     # Root — Google Fonts (Source Serif 4, Inter, JetBrains Mono)
+│   └── globals.css                    # CSS custom properties + Tailwind v4 @theme
+├── modules/
+│   └── waitlist/                      # wl_ module — all waitlist-specific code
+│       ├── components/                # All UI components
+│       │   ├── WaitlistTable.tsx      # Filterable/sortable table
+│       │   ├── ChildDetailPanel.tsx   # Slide-in: child/waitlist edit + parent edit + tasks
+│       │   ├── AddChildModal.tsx      # 3-step modal: Family → Child → Entry
+│       │   ├── FamiliesTable.tsx      # Family list table
+│       │   ├── FamilyDetailPanel.tsx  # Slide-in: family + parents (full CRUD)
+│       │   ├── TermsManager.tsx       # Term CRUD on Admin page
+│       │   ├── DataIntegrityPanel.tsx # Integrity checks (Admin only)
+│       │   ├── TopNav.tsx             # Nav: Dashboard · Waitlist · Admin
+│       │   └── ...                    # Dashboard charts, tasks table, sign-out
+│       ├── lib/actions/               # Server Actions — all DB mutations
+│       │   ├── waitlist.ts            # updateWaitlistItem, createTask
+│       │   ├── children.ts            # createWaitlistEntry (3-step)
+│       │   ├── families.ts            # createFamily, deleteFamily, updateParent,
+│       │   │                          #   addParent, deleteParent, moveParent/Child
+│       │   ├── tasks.ts               # updateTask
+│       │   ├── terms.ts               # createTerm, updateTerm, deleteTerm
+│       │   └── integrity.ts           # checkDataIntegrity
+│       └── types/index.ts             # WaitlistItem, SchoolTerm types
+├── lib/supabase/
+│   ├── client.ts                      # Browser client
+│   └── server.ts                      # Server client (cookies)
+├── middleware.ts                      # Session refresh (every request)
 ├── reference/
-│   ├── wildwood_schema.sql       # Authoritative DB schema + change log
-│   └── wildwood-hybrid.html      # Design reference — open to see the look
-├── PROJECT.md                    # Current feature state + file map
-└── CONVENTIONS.md                # Platform architecture + patterns
+│   ├── wildwood_schema.sql            # Authoritative DB schema + change log
+│   └── wildwood-hybrid.html          # Design reference — open to see the look
+├── PROJECT.md                         # Current feature state + file map
+└── CONVENTIONS.md                     # Platform architecture + patterns
 ```
 
 ---
@@ -286,21 +298,21 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<from Supabase Dashboard>
 
 ---
 
-## Current Phase: Phase 1 — Platform Foundation
+## Current Phase: Phase 2 — Subdomain Routing & Domain Migration
 
-Actively refactoring Wildwood into the multi-tenant, multi-module pattern. See ROADMAP.md for the full sequence.
+Phase 1 complete. Now migrating from `wildwood.liftcollab.org` to `wildwood.liftcollab.app`
+with proper subdomain-based tenant routing. See ROADMAP.md for the full sequence.
 
-**Phase 1 tasks (in order):**
-1. Refactor app code into `/modules/waitlist/` structure — no functionality change
-2. Rename DB tables with `wl_` prefix (coordinated migration — all queries updated in sync)
-3. Add `modules` and `organization_modules` tables (module registry); seed for Wildwood
-4. Add `slug` and `type` columns to `organizations`
-5. Full regression test of Wildwood functionality
+**Phase 2 tasks (in order):**
+1. Implement subdomain middleware — reads subdomain, looks up org by slug, sets org context
+2. Add `wildwood.liftcollab.app` domain in Vercel
+3. Configure Cloudflare DNS (CNAME → Vercel, DNS-only / gray cloud)
+4. Test thoroughly — auth, data isolation, subdomain context
+5. Redirect `wildwood.liftcollab.org` → `wildwood.liftcollab.app`
 
-**Not yet built (Phases 2+):**
-- Subdomain middleware (`wildwood.liftcollab.app` → org context)
-- Domain migration from `.org` to `.app`
+**Not yet built (Phases 3+):**
 - Program management module (`pm_`)
+- Multi-tenant onboarding tools
 - Second tenant
 
 Full platform architecture in ARCHITECTURE.md and CONVENTIONS.md.
@@ -336,3 +348,4 @@ Append decisions and notes here chronologically. Most recent at bottom.
 - *2026-05-27:* Created `PROJECT.md` (current state), `CONVENTIONS.md` (multi-tenant platform architecture), and updated `CLAUDE.md`. Platform renamed to LiftCollab internally. Module prefix convention established (`wl_` for waitlist). Future architectural steps documented.
 - *2026-05-27:* Added `STRATEGY.md` (LIFT vision, Head/Heart/Hands, funder positioning, Wildwood origin story), `ARCHITECTURE.md` (multi-tenant DB schema, subdomain routing, code organization), and `ROADMAP.md` (5-phase implementation plan). CLAUDE.md updated to reflect Phase 1 as active work. CONVENTIONS.md reconciled against ARCHITECTURE.md.
 - *2026-05-27:* Phase 1 complete. Executed all steps: code into `/modules/waitlist/`, DB tables renamed to `wl_` prefix, `modules` and `organization_modules` tables added, `slug`/`type`/`domain` added to `organizations`. Regression testing found and fixed two bugs introduced by the table rename: (1) embedded join queries in FamilyDetailPanel/AddChildModal still used old table names — fixed with PostgREST alias syntax (`children:wl_children(...)`); (2) six trigger functions (`fn_recompute_family_priority`, `fn_recompute_family_name`, `fn_trg_waitlist_items_priority`, and wrappers) still referenced old table names, causing all `wl_parents` UPDATEs to silently roll back — fixed in `phase1_fix_trigger_functions.sql` migration. These functions were missing from the schema file and therefore not caught in the original rename migration.
+- *2026-05-28:* Post-Phase-1 feature work and bug fixes. Bug fixes: AddChild modal submit always disabled (term_id not pre-populated); task name incorrectly editable on dashboard; primary contact checkbox uncontrolled→controlled error + double-toggle bug; school history change not reflecting in Families table (added priority_status/rank re-fetch after save). Features: term deletion (Admin only, with guard); "New family" option in parent move picker; renamed "Remove" → "Delete" with stronger confirm copy; empty-family banner with delete prompt; orphaned_parent check added to `data_integrity_issues` DB view and DataIntegrityPanel; enriched family display in Waitlist panel (email, phone, school history badges); section-level parent editing in Waitlist panel (edit/add/delete parents without leaving the panel); Families page consolidated into Admin page (`/settings`) — nav simplified to Dashboard · Waitlist · Admin; `/families` redirects to `/settings`; `updateFamilyName` dead code removed. Four bugs fixed after code review: `updateParent`/`addParent`/`deleteParent` missing `revalidatePath("/waitlist")`; priority not refreshed after remove/move parent in FamilyDetailPanel; stale family data briefly shown on child switch; dead `updateFamilyName` action.

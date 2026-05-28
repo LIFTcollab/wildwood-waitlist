@@ -4,13 +4,12 @@ This roadmap sequences the work of evolving the Wildwood waitlist app into the L
 
 ## Current State
 
-- Wildwood waitlist app exists (Next.js, Vercel, Supabase)
-- Lives at `wildwood.liftcollab.org`
-- Single-tenant in practice but with Organization table foundation already in place
-- All key tables (Children, Parents, Waitlist) already reference Organization
-- Not in active production use — refactoring freedom is high
+- Wildwood waitlist app live at `wildwood.liftcollab.org`
+- Phase 1 complete — code and DB on multi-tenant, multi-module foundation
+- All tables prefixed `wl_`; `modules` and `organization_modules` tables seeded
+- App in active use; ongoing feature work running alongside Phase 2
 
-## Phase 1 — Platform Foundation
+## Phase 1 — Platform Foundation ✓ Complete
 
 ### Goal
 Establish the multi-tenant, multi-module foundation without breaking existing waitlist functionality.
@@ -42,7 +41,7 @@ Establish the multi-tenant, multi-module foundation without breaking existing wa
 - Full test of waitlist functionality
 - Confirm no regressions
 
-## Phase 2 — Subdomain Routing & Domain Migration
+## Phase 2 — Subdomain Routing & Domain Migration ← Active
 
 ### Goal
 Move from `wildwood.liftcollab.org` to `wildwood.liftcollab.app` with proper subdomain-based tenant routing.
