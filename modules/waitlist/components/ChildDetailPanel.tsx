@@ -558,7 +558,7 @@ export function ChildDetailPanel({
         className="fixed right-0 top-0 h-full w-[440px] bg-surface border-l border-border z-50 shadow-2xl flex flex-col"
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-5 border-b border-border flex-shrink-0">
+        <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-5 flex-shrink-0">
           <div className="min-w-0 flex-1">
             {isEditing ? (
               <div className="flex gap-2">
@@ -752,7 +752,7 @@ export function ChildDetailPanel({
                       {canEdit && !isEditing && !isEditingParents && (
                         <button
                           onClick={startEditParents}
-                          className="text-[11.5px] text-text-3 hover:text-text transition-colors"
+                          className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-text-2 border border-border hover:border-border-strong hover:text-text transition-colors"
                         >
                           Edit
                         </button>
