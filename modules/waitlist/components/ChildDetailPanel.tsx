@@ -573,12 +573,6 @@ export function ChildDetailPanel({
                 <p className="text-[12px] text-text-3 italic">Loading family…</p>
               ) : familyInfo ? (
                 <>
-                  <Field label="Family">
-                    <p className="font-serif text-[14px] font-medium text-text">
-                      {familyInfo.name || "—"}
-                    </p>
-                  </Field>
-
                   <Field label="Parents">
                     {familyInfo.parents.length === 0 ? (
                       <p className="text-[13px] text-text-3 italic">None on record</p>
