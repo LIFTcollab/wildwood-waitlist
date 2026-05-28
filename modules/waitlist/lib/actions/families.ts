@@ -99,6 +99,52 @@ export async function deleteParent(
   return { error: null };
 }
 
+export async function deleteFamily(
+  id: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can delete families" };
+
+  // Guard: refuse if any children remain
+  const { count: childCount } = await supabase
+    .from("wl_children")
+    .select("id", { count: "exact", head: true })
+    .eq("family_id", id);
+
+  if (childCount && childCount > 0)
+    return { error: `Cannot delete: ${childCount} ${childCount === 1 ? "child is" : "children are"} still linked to this family` };
+
+  // Guard: refuse if any parents remain
+  const { count: parentCount } = await supabase
+    .from("wl_parents")
+    .select("id", { count: "exact", head: true })
+    .eq("family_id", id);
+
+  if (parentCount && parentCount > 0)
+    return { error: "Cannot delete: parents are still linked to this family" };
+
+  const { error } = await supabase
+    .from("wl_families")
+    .delete()
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/families");
+  return { error: null };
+}
+
 export async function moveParentToFamily(
   parentId: string,
   familyId: string

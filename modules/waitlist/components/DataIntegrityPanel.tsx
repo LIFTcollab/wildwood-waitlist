@@ -24,6 +24,7 @@ const ISSUE_META: Record<string, { label: string; icon: string }> = {
   multiple_primary_contacts:{ label: "Multiple primary contacts",icon: "☎️"  },
   name_drift:               { label: "Name mismatch",            icon: "✏️"  },
   duplicate_email:          { label: "Duplicate email",          icon: "✉️"  },
+  orphaned_parent:          { label: "Parent has no family",     icon: "🔗" },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

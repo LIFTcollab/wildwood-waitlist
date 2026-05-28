@@ -6,6 +6,7 @@ import {
   updateParent,
   addParent,
   deleteParent,
+  deleteFamily,
   moveChildToFamily,
   moveParentToFamily,
   createFamily,
@@ -145,11 +146,13 @@ export function FamilyDetailPanel({
   canEdit,
   onClose,
   onUpdate,
+  onDelete,
 }: {
   familyId:  string | null;
   canEdit:   boolean;
   onClose:   () => void;
   onUpdate:  (id: string, updated: Pick<FamilyRow, "name" | "parents">) => void;
+  onDelete?: (id: string) => void;
 }) {
   const [family,     setFamily]     = useState<FamilyDetail | null>(null);
   const [loading,    setLoading]    = useState(false);
@@ -180,6 +183,10 @@ export function FamilyDetailPanel({
   const [parentNewFamilyMode, setParentNewFamilyMode] = useState(false);
   const [parentNewFamilyName, setParentNewFamilyName] = useState("");
   const [creatingFamily,      setCreatingFamily]      = useState(false);
+
+  // Delete empty family
+  const [deletingFamily,    setDeletingFamily]    = useState(false);
+  const [deleteFamilyError, setDeleteFamilyError] = useState<string | null>(null);
 
   // Fetch full family detail whenever the panel opens
   useEffect(() => {
@@ -356,6 +363,20 @@ export function FamilyDetailPanel({
         })),
       });
     }
+  }
+
+  async function handleDeleteFamily() {
+    if (!family) return;
+    setDeletingFamily(true);
+    setDeleteFamilyError(null);
+    const result = await deleteFamily(family.id);
+    if (result.error) {
+      setDeleteFamilyError(result.error);
+      setDeletingFamily(false);
+      return;
+    }
+    onDelete?.(family.id);
+    onClose();
   }
 
   function handleCancel() {
@@ -774,13 +795,13 @@ export function FamilyDetailPanel({
                               </button>
                             )}
 
-                            {/* Remove / confirm */}
+                            {/* Delete parent / confirm */}
                             {confirmKey === p._key ? (
                               <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-[12px] text-text-2">Remove?</span>
+                                <span className="text-[12px] text-terra font-medium">Delete permanently?</span>
                                 <button
                                   onClick={() => handleRemoveParent(p)}
-                                  className="text-[12px] text-terra font-medium hover:underline"
+                                  className="text-[12px] text-terra font-semibold hover:underline"
                                 >
                                   Yes
                                 </button>
@@ -797,7 +818,7 @@ export function FamilyDetailPanel({
                                   onClick={() => setConfirmKey(p._key)}
                                   className="flex-shrink-0 text-[12px] text-text-3 hover:text-terra transition-colors"
                                 >
-                                  Remove
+                                  Delete
                                 </button>
                               )
                             )}
@@ -970,6 +991,43 @@ export function FamilyDetailPanel({
                   </button>
                 )}
               </div>
+
+              {/* ── No-parents banner (view mode only) ──────────────────── */}
+              {!isEditing && !loading && family && family.parents.length === 0 && (
+                <div className="rounded-xl border border-terra/30 bg-terra-soft/40 p-4 space-y-2">
+                  <p className="text-[13px] font-medium text-terra">This family has no parents.</p>
+                  {family.children.length > 0 ? (
+                    <p className="text-[12.5px] text-text-2">
+                      Move or remove the {family.children.length === 1 ? "child" : `${family.children.length} children`} before this family can be deleted.
+                    </p>
+                  ) : canEdit ? (
+                    <>
+                      <p className="text-[12.5px] text-text-2">
+                        No children either. You can delete this empty family.
+                      </p>
+                      {deleteFamilyError && (
+                        <p className="text-[12px] text-terra">{deleteFamilyError}</p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleDeleteFamily}
+                          disabled={deletingFamily}
+                          className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-terra hover:opacity-80 transition-opacity disabled:opacity-50"
+                        >
+                          {deletingFamily ? "Deleting…" : "Delete family"}
+                        </button>
+                        <button
+                          onClick={onClose}
+                          disabled={deletingFamily}
+                          className="text-[12px] text-text-3 hover:text-text transition-colors disabled:opacity-50"
+                        >
+                          Keep it
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )}
 
               {/* ── Children ─────────────────────────────────────────────── */}
               <div className="border-t border-border pt-5">

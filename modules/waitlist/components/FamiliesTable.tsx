@@ -128,6 +128,11 @@ export function FamiliesTable({
     );
   }
 
+  function handleDelete(id: string) {
+    setLocalFamilies((prev) => prev.filter((f) => f.id !== id));
+    setSelectedId(null);
+  }
+
   function handleSort(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -423,6 +428,7 @@ export function FamiliesTable({
         canEdit={canEdit}
         onClose={() => setSelectedId(null)}
         onUpdate={handleUpdate}
+        onDelete={handleDelete}
       />
     </div>
   );
