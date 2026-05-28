@@ -12,6 +12,39 @@ export type ParentData = {
   school_history: "Board" | "Teacher" | "Alumni" | null;
 };
 
+export async function createFamily(
+  name: string
+): Promise<{ error: string | null; id: string | null }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated", id: null };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("organization_id, role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can create families", id: null };
+
+  if (!profile?.organization_id)
+    return { error: "No organization found for your account", id: null };
+
+  const { data, error } = await supabase
+    .from("wl_families")
+    .insert({ name: name.trim(), organization_id: profile.organization_id })
+    .select("id")
+    .single();
+
+  if (error || !data)
+    return { error: error?.message ?? "Failed to create family", id: null };
+
+  revalidatePath("/families");
+  return { error: null, id: data.id };
+}
+
 export async function updateFamilyName(
   id: string,
   name: string

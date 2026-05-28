@@ -8,6 +8,7 @@ import {
   deleteParent,
   moveChildToFamily,
   moveParentToFamily,
+  createFamily,
   type ParentData,
 } from "@/modules/waitlist/lib/actions/families";
 import type { FamilyRow } from "./FamiliesTable";
@@ -175,6 +176,10 @@ export function FamilyDetailPanel({
   const [parentFamilySearch, setParentFamilySearch] = useState("");
   const [parentMoving,       setParentMoving]       = useState(false);
   const [parentMoveError,    setParentMoveError]    = useState<string | null>(null);
+  // Create-new-family sub-mode within the parent move picker
+  const [parentNewFamilyMode, setParentNewFamilyMode] = useState(false);
+  const [parentNewFamilyName, setParentNewFamilyName] = useState("");
+  const [creatingFamily,      setCreatingFamily]      = useState(false);
 
   // Fetch full family detail whenever the panel opens
   useEffect(() => {
@@ -365,6 +370,9 @@ export function FamilyDetailPanel({
     setMovingParentKey(null);
     setParentFamilySearch("");
     setParentMoveError(null);
+    setParentNewFamilyMode(false);
+    setParentNewFamilyName("");
+    setCreatingFamily(false);
   }
 
   async function loadFamilies() {
@@ -417,6 +425,69 @@ export function FamilyDetailPanel({
     setMovingParentKey(null);
     setParentFamilySearch("");
     setParentMoving(false);
+    if (family) {
+      onUpdate(family.id, {
+        name:    computeFamilyName(remaining, family.name),
+        parents: remaining.map((fp) => ({
+          id:              fp.id,
+          first_name:      fp.first_name,
+          last_name:       fp.last_name,
+          primary_contact: fp.primary_contact,
+        })),
+      });
+    }
+  }
+
+  async function handleCreateAndMove(parentKey: string) {
+    if (!parentNewFamilyName.trim()) return;
+    setCreatingFamily(true);
+    setParentMoveError(null);
+
+    // Step 1: create the new family
+    const createResult = await createFamily(parentNewFamilyName.trim());
+    if (createResult.error) {
+      setParentMoveError(createResult.error);
+      setCreatingFamily(false);
+      return;
+    }
+
+    // Add to local list so it shows up in future pickers
+    setAllFamilies((prev) =>
+      [...prev, { id: createResult.id!, name: parentNewFamilyName.trim() }]
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+
+    // Step 2: move the parent to the new family
+    const parent = form.parents.find((p) => p._key === parentKey);
+    if (!parent?.id) { setCreatingFamily(false); return; }
+
+    setParentMoving(true);
+    const moveResult = await moveParentToFamily(parent.id, createResult.id!);
+    if (moveResult.error) {
+      setParentMoveError(moveResult.error);
+      setParentMoving(false);
+      setCreatingFamily(false);
+      return;
+    }
+
+    // Success — clean up all state
+    const remaining = family
+      ? family.parents.filter((fp) => fp.id !== parent.id)
+      : [];
+    setFamily((prev) =>
+      prev ? { ...prev, parents: prev.parents.filter((fp) => fp.id !== parent.id) } : prev
+    );
+    setForm((prev) => ({
+      ...prev,
+      parents: prev.parents.filter((fp) => fp._key !== parentKey),
+    }));
+    setMovingParentKey(null);
+    setParentFamilySearch("");
+    setParentNewFamilyMode(false);
+    setParentNewFamilyName("");
+    setParentMoving(false);
+    setCreatingFamily(false);
+
     if (family) {
       onUpdate(family.id, {
         name:    computeFamilyName(remaining, family.name),
@@ -739,59 +810,116 @@ export function FamilyDetailPanel({
                                   ⚠ This is the only parent in this family.
                                 </p>
                               )}
-                              <p className="text-[11.5px] text-text-3">Move to which family?</p>
-                              <div className="relative">
-                                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-3 pointer-events-none" viewBox="0 0 16 16" fill="none">
-                                  <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
-                                  <path d="m10.5 10.5 3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                                </svg>
-                                <input
-                                  autoFocus
-                                  type="text"
-                                  placeholder="Search families…"
-                                  value={parentFamilySearch}
-                                  onChange={(e) => setParentFamilySearch(e.target.value)}
-                                  className={inputCls + " pl-8 text-[12.5px]"}
-                                />
-                              </div>
-                              <div className="max-h-[180px] overflow-y-auto rounded-lg border border-border divide-y divide-border">
-                                {allFamilies
-                                  .filter(
-                                    (f) =>
-                                      f.id !== family?.id &&
-                                      (!parentFamilySearch.trim() ||
-                                        f.name.toLowerCase().includes(parentFamilySearch.toLowerCase()))
-                                  )
-                                  .map((f) => (
+
+                              {parentNewFamilyMode ? (
+                                /* ── Create new family sub-mode ── */
+                                <>
+                                  <p className="text-[11.5px] text-text-3">New family name</p>
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={parentNewFamilyName}
+                                    onChange={(e) => setParentNewFamilyName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") handleCreateAndMove(p._key);
+                                      if (e.key === "Escape") {
+                                        setParentNewFamilyMode(false);
+                                        setParentNewFamilyName("");
+                                        setParentMoveError(null);
+                                      }
+                                    }}
+                                    placeholder="e.g. Garcia Family"
+                                    className={inputCls + " text-[12.5px]"}
+                                  />
+                                  {parentMoveError && (
+                                    <p className="text-[12px] text-terra">{parentMoveError}</p>
+                                  )}
+                                  <div className="flex items-center gap-2">
                                     <button
-                                      key={f.id}
-                                      onClick={() => handleMoveParent(f.id, p._key)}
-                                      disabled={parentMoving}
-                                      className="w-full text-left px-3 py-2 text-[13px] text-text hover:bg-surface-hover transition-colors disabled:opacity-50"
+                                      onClick={() => handleCreateAndMove(p._key)}
+                                      disabled={!parentNewFamilyName.trim() || creatingFamily}
+                                      className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-green hover:bg-green-deep transition-colors disabled:opacity-40 disabled:cursor-default"
                                     >
-                                      {f.name}
+                                      {creatingFamily ? "Creating…" : "Create & move"}
                                     </button>
-                                  ))}
-                                {allFamilies.filter(
-                                  (f) =>
-                                    f.id !== family?.id &&
-                                    (!parentFamilySearch.trim() ||
-                                      f.name.toLowerCase().includes(parentFamilySearch.toLowerCase()))
-                                ).length === 0 && (
-                                  <p className="px-3 py-2 text-[12.5px] text-text-3 italic">
-                                    {familiesLoaded ? "No families found." : "Loading…"}
-                                  </p>
-                                )}
-                              </div>
-                              {parentMoveError && (
-                                <p className="text-[12px] text-terra">{parentMoveError}</p>
+                                    <button
+                                      onClick={() => { setParentNewFamilyMode(false); setParentNewFamilyName(""); setParentMoveError(null); }}
+                                      disabled={creatingFamily}
+                                      className="text-[12px] text-text-3 hover:text-text transition-colors disabled:opacity-50"
+                                    >
+                                      ← Back
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                /* ── Search existing families ── */
+                                <>
+                                  <p className="text-[11.5px] text-text-3">Move to which family?</p>
+                                  <div className="relative">
+                                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-3 pointer-events-none" viewBox="0 0 16 16" fill="none">
+                                      <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
+                                      <path d="m10.5 10.5 3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                    </svg>
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      placeholder="Search families…"
+                                      value={parentFamilySearch}
+                                      onChange={(e) => setParentFamilySearch(e.target.value)}
+                                      className={inputCls + " pl-8 text-[12.5px]"}
+                                    />
+                                  </div>
+                                  <div className="max-h-[180px] overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                                    {allFamilies
+                                      .filter(
+                                        (f) =>
+                                          f.id !== family?.id &&
+                                          (!parentFamilySearch.trim() ||
+                                            f.name.toLowerCase().includes(parentFamilySearch.toLowerCase()))
+                                      )
+                                      .map((f) => (
+                                        <button
+                                          key={f.id}
+                                          onClick={() => handleMoveParent(f.id, p._key)}
+                                          disabled={parentMoving}
+                                          className="w-full text-left px-3 py-2 text-[13px] text-text hover:bg-surface-hover transition-colors disabled:opacity-50"
+                                        >
+                                          {f.name}
+                                        </button>
+                                      ))}
+                                    {allFamilies.filter(
+                                      (f) =>
+                                        f.id !== family?.id &&
+                                        (!parentFamilySearch.trim() ||
+                                          f.name.toLowerCase().includes(parentFamilySearch.toLowerCase()))
+                                    ).length === 0 && (
+                                      <p className="px-3 py-2 text-[12.5px] text-text-3 italic">
+                                        {familiesLoaded ? "No other families." : "Loading…"}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {parentMoveError && (
+                                    <p className="text-[12px] text-terra">{parentMoveError}</p>
+                                  )}
+                                  <div className="flex items-center justify-between">
+                                    <button
+                                      onClick={() => { setParentNewFamilyMode(true); setParentFamilySearch(""); setParentMoveError(null); }}
+                                      className="flex items-center gap-1 text-[12px] text-green hover:text-green-deep font-medium transition-colors"
+                                    >
+                                      <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+                                        <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+                                      </svg>
+                                      New family
+                                    </button>
+                                    <button
+                                      onClick={() => { setMovingParentKey(null); setParentFamilySearch(""); setParentMoveError(null); }}
+                                      className="text-[12px] text-text-3 hover:text-text transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </>
                               )}
-                              <button
-                                onClick={() => { setMovingParentKey(null); setParentFamilySearch(""); setParentMoveError(null); }}
-                                className="text-[12px] text-text-3 hover:text-text transition-colors"
-                              >
-                                Cancel
-                              </button>
                             </div>
                           )}
                         </div>
