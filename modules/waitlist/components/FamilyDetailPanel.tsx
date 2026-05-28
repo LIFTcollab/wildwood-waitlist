@@ -120,7 +120,7 @@ function parentToForm(p: ParentDetail): ParentForm {
     last_name:       p.last_name,
     email:           p.email ?? "",
     phone:           p.phone ?? "",
-    primary_contact: p.primary_contact,
+    primary_contact: p.primary_contact ?? false,
     school_history:  p.school_history ?? "",
   };
 }
