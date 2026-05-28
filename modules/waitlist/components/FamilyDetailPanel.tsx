@@ -151,7 +151,7 @@ export function FamilyDetailPanel({
   familyId:  string | null;
   canEdit:   boolean;
   onClose:   () => void;
-  onUpdate:  (id: string, updated: Pick<FamilyRow, "name" | "parents">) => void;
+  onUpdate:  (id: string, updated: Pick<FamilyRow, "name" | "parents"> & Partial<Pick<FamilyRow, "priority_status" | "priority_rank">>) => void;
   onDelete?: (id: string) => void;
 }) {
   const [family,     setFamily]     = useState<FamilyDetail | null>(null);
@@ -585,10 +585,20 @@ export function FamilyDetailPanel({
     }));
 
     const computedName = computeFamilyName(updatedParents, family.name);
+
+    // Re-fetch priority_status / priority_rank — DB trigger may have changed them
+    const supabase = createClient();
+    const { data: refreshed } = await supabase
+      .from("wl_families")
+      .select("priority_status, priority_rank")
+      .eq("id", family.id)
+      .single();
+
     const updatedFamily: FamilyDetail = {
       ...family,
-      name:    computedName,
-      parents: updatedParents,
+      name:            computedName,
+      parents:         updatedParents,
+      priority_status: refreshed?.priority_status ?? family.priority_status,
     };
     setFamily(updatedFamily);
     // Patch form keys with real ids for any newly inserted parents
@@ -596,9 +606,11 @@ export function FamilyDetailPanel({
       parents: updatedParents.map(parentToForm),
     });
 
-    // Sync the families table row
+    // Sync the families table row — including refreshed priority fields
     onUpdate(family.id, {
-      name: computedName,
+      name:            computedName,
+      priority_status: refreshed?.priority_status ?? family.priority_status,
+      priority_rank:   (refreshed?.priority_rank as number | null | undefined) ?? null,
       parents: updatedParents.map((p) => ({
         id:              p.id,
         first_name:      p.first_name,

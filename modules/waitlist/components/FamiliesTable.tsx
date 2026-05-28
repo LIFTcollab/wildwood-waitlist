@@ -122,7 +122,11 @@ export function FamiliesTable({
     if (openFamilyId) setSelectedId(openFamilyId);
   }, [openFamilyId]);
 
-  function handleUpdate(id: string, updated: Pick<FamilyRow, "name" | "parents">) {
+  function handleUpdate(
+    id: string,
+    updated: Pick<FamilyRow, "name" | "parents"> &
+      Partial<Pick<FamilyRow, "priority_status" | "priority_rank">>
+  ) {
     setLocalFamilies((prev) =>
       prev.map((f) => (f.id === id ? { ...f, ...updated } : f))
     );
