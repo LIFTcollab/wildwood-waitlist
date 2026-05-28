@@ -41,7 +41,7 @@ export async function createFamily(
   if (error || !data)
     return { error: error?.message ?? "Failed to create family", id: null };
 
-  revalidatePath("/families");
+  revalidatePath("/settings");
   return { error: null, id: data.id };
 }
 
@@ -55,7 +55,7 @@ export async function updateFamilyName(
     .update({ name })
     .eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/families");
+  revalidatePath("/settings");
   return { error: null };
 }
 
@@ -69,7 +69,7 @@ export async function updateParent(
     .update(data)
     .eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/families");
+  revalidatePath("/settings");
   return { error: null };
 }
 
@@ -85,7 +85,7 @@ export async function addParent(
     .select("id")
     .single();
   if (error) return { error: error.message, id: null };
-  revalidatePath("/families");
+  revalidatePath("/settings");
   return { error: null, id: result.id };
 }
 
@@ -95,7 +95,7 @@ export async function deleteParent(
   const supabase = await createClient();
   const { error } = await supabase.from("wl_parents").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath("/families");
+  revalidatePath("/settings");
   return { error: null };
 }
 
@@ -141,7 +141,7 @@ export async function deleteFamily(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/families");
+  revalidatePath("/settings");
   return { error: null };
 }
 
@@ -170,7 +170,7 @@ export async function moveParentToFamily(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/families");
+  revalidatePath("/settings");
   return { error: null };
 }
 
@@ -199,7 +199,7 @@ export async function moveChildToFamily(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/families");
+  revalidatePath("/settings");
   revalidatePath("/waitlist");
   return { error: null };
 }
