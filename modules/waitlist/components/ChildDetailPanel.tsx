@@ -563,10 +563,9 @@ export function ChildDetailPanel({
             )}
           </Field>
 
-          {/* ── Family + Tasks sections (view mode only) ──────────────── */}
-          {!isEditing && (
-            <>
-              {/* ── Family ─────────────────────────────────────────────── */}
+          {/* ── Family + Tasks sections ───────────────────────────────── */}
+          <>
+            {/* ── Family ─────────────────────────────────────────────── */}
               <div className="border-t border-border" />
 
               {familyLoading ? (
@@ -771,8 +770,7 @@ export function ChildDetailPanel({
                   </div>
                 )}
               </div>
-            </>
-          )}
+          </>
 
           {/* Save error */}
           {saveError && (
