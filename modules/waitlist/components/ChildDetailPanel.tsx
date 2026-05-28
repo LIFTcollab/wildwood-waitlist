@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/modules/waitlist/types";
 import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
 import { updateWaitlistItem, createTask } from "@/modules/waitlist/lib/actions/waitlist";
+import { updateParent, addParent, deleteParent, type ParentData } from "@/modules/waitlist/lib/actions/families";
 import { createClient } from "@/lib/supabase/client";
 
 // ─── Family info types (fetched on demand) ────────────────────────────────────
@@ -18,7 +19,18 @@ type ParentInfo  = {
   school_history:  "Board" | "Teacher" | "Alumni" | null;
 };
 type SiblingInfo = { id: string; first_name: string; last_name: string };
-type FamilyInfo  = { id: string; name: string; parents: ParentInfo[]; children: SiblingInfo[] };
+type FamilyInfo  = { id: string; name: string; organization_id: string; parents: ParentInfo[]; children: SiblingInfo[] };
+
+type ParentFormEntry = {
+  _key:            string;
+  id:              string | null;  // null = new, unsaved
+  first_name:      string;
+  last_name:       string;
+  email:           string;
+  phone:           string;
+  primary_contact: boolean;
+  school_history:  string;         // "" | "Board" | "Teacher" | "Alumni"
+};
 
 // ─── Task types (fetched on demand) ──────────────────────────────────────────
 
@@ -60,6 +72,35 @@ function getAge(dob: string | null): string {
   if (years === 0) return `${months}mo`;
   if (months === 0) return `${years}y`;
   return `${years}y ${months}mo`;
+}
+
+// ─── Parent form helpers ──────────────────────────────────────────────────────
+
+let _parentKeyCounter = 0;
+function newParentKey() { return `new-${++_parentKeyCounter}`; }
+
+function parentInfoToForm(p: ParentInfo): ParentFormEntry {
+  return {
+    _key:            p.id,
+    id:              p.id,
+    first_name:      p.first_name,
+    last_name:       p.last_name,
+    email:           p.email ?? "",
+    phone:           p.phone ?? "",
+    primary_contact: p.primary_contact ?? false,
+    school_history:  p.school_history ?? "",
+  };
+}
+
+function formToParentData(p: ParentFormEntry): ParentData {
+  return {
+    first_name:      p.first_name.trim(),
+    last_name:       p.last_name.trim(),
+    email:           p.email.trim() || null,
+    phone:           p.phone.trim() || null,
+    primary_contact: p.primary_contact,
+    school_history:  (p.school_history as "Board" | "Teacher" | "Alumni") || null,
+  };
 }
 
 // ─── Field wrapper ────────────────────────────────────────────────────────────
@@ -144,6 +185,14 @@ export function ChildDetailPanel({
   const [familyInfo,    setFamilyInfo]    = useState<FamilyInfo | null>(null);
   const [familyLoading, setFamilyLoading] = useState(false);
 
+  // Parent edit state
+  const [isEditingParents, setIsEditingParents] = useState(false);
+  const [parentForm,       setParentForm]       = useState<ParentFormEntry[]>([]);
+  const [savingParents,    setSavingParents]     = useState(false);
+  const [parentSaveError,  setParentSaveError]   = useState<string | null>(null);
+  const [confirmDeleteKey, setConfirmDeleteKey]  = useState<string | null>(null);
+  const [deleteParentErr,  setDeleteParentErr]   = useState<string | null>(null);
+
   // Task state
   const [tasks,          setTasks]          = useState<TaskInfo[]>([]);
   const [tasksLoading,   setTasksLoading]   = useState(false);
@@ -162,6 +211,11 @@ export function ChildDetailPanel({
     setSaveError(null);
     setEditingTaskId(null);
     setEditingText("");
+    setIsEditingParents(false);
+    setParentForm([]);
+    setParentSaveError(null);
+    setConfirmDeleteKey(null);
+    setDeleteParentErr(null);
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch family info whenever the selected child changes
@@ -173,7 +227,7 @@ export function ChildDetailPanel({
       try {
         const { data } = await supabase
           .from("wl_children")
-          .select("families:wl_families(id, name, parents:wl_parents(id, first_name, last_name, email, phone, primary_contact, school_history), children:wl_children(id, first_name, last_name))")
+          .select("families:wl_families(id, name, organization_id, parents:wl_parents(id, first_name, last_name, email, phone, primary_contact, school_history), children:wl_children(id, first_name, last_name))")
           .eq("id", item.child_id)
           .single();
         setFamilyInfo((data?.families as unknown as FamilyInfo) ?? null);
@@ -209,13 +263,14 @@ export function ChildDetailPanel({
     if (!item) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isEditing) { setIsEditing(false); setSaveError(null); }
+        if (isEditingParents) { handleCancelParents(); }
+        else if (isEditing) { setIsEditing(false); setSaveError(null); }
         else onClose();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [item, isEditing, onClose]);
+  }, [item, isEditing, isEditingParents, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!item) return null;
 
@@ -278,6 +333,122 @@ export function ChildDetailPanel({
     setForm(itemToForm(item));
     setIsEditing(false);
     setSaveError(null);
+  }
+
+  // ── Parent editing ─────────────────────────────────────────────────────────
+
+  function startEditParents() {
+    if (!familyInfo) return;
+    setParentForm(familyInfo.parents.map(parentInfoToForm));
+    setParentSaveError(null);
+    setConfirmDeleteKey(null);
+    setDeleteParentErr(null);
+    setIsEditingParents(true);
+  }
+
+  function handleCancelParents() {
+    setIsEditingParents(false);
+    setParentForm([]);
+    setParentSaveError(null);
+    setConfirmDeleteKey(null);
+    setDeleteParentErr(null);
+  }
+
+  function setParentField(key: string, field: keyof ParentFormEntry, value: unknown) {
+    setParentForm((prev) =>
+      prev.map((p) => p._key === key ? { ...p, [field]: value } : p)
+    );
+  }
+
+  function addNewParent() {
+    const k = newParentKey();
+    setParentForm((prev) => [
+      ...prev,
+      { _key: k, id: null, first_name: "", last_name: "", email: "", phone: "", primary_contact: false, school_history: "" },
+    ]);
+  }
+
+  async function handleDeleteParent(p: ParentFormEntry) {
+    setDeleteParentErr(null);
+    if (p.id === null) {
+      setParentForm((prev) => prev.filter((fp) => fp._key !== p._key));
+      setConfirmDeleteKey(null);
+      return;
+    }
+    const result = await deleteParent(p.id);
+    if (result.error) {
+      setDeleteParentErr(result.error);
+      setConfirmDeleteKey(null);
+      return;
+    }
+    setFamilyInfo((prev) =>
+      prev ? { ...prev, parents: prev.parents.filter((fp) => fp.id !== p.id) } : prev
+    );
+    setParentForm((prev) => prev.filter((fp) => fp._key !== p._key));
+    setConfirmDeleteKey(null);
+  }
+
+  async function handleSaveParents() {
+    if (!familyInfo || !item) return;
+    setSavingParents(true);
+    setParentSaveError(null);
+
+    // Update existing parents in parallel
+    const existing = parentForm.filter((p) => p.id !== null);
+    const updateResults = await Promise.all(
+      existing.map((p) => updateParent(p.id!, formToParentData(p)))
+    );
+    const updateError = updateResults.find((r) => r.error);
+    if (updateError?.error) {
+      setParentSaveError(updateError.error);
+      setSavingParents(false);
+      return;
+    }
+
+    // Insert new parents sequentially (need returned ids)
+    const newParentIds: Record<string, string> = {};
+    for (const p of parentForm.filter((fp) => fp.id === null)) {
+      const r = await addParent(familyInfo.id, familyInfo.organization_id, formToParentData(p));
+      if (r.error) {
+        setParentSaveError(r.error);
+        setSavingParents(false);
+        return;
+      }
+      if (r.id) newParentIds[p._key] = r.id;
+    }
+
+    // Build updated parents list
+    const updatedParents: ParentInfo[] = parentForm.map((p) => ({
+      id:              p.id ?? newParentIds[p._key] ?? "",
+      first_name:      p.first_name.trim(),
+      last_name:       p.last_name.trim(),
+      email:           p.email.trim() || null,
+      phone:           p.phone.trim() || null,
+      primary_contact: p.primary_contact,
+      school_history:  (p.school_history as "Board" | "Teacher" | "Alumni") || null,
+    }));
+
+    // Re-fetch priority — DB trigger may have changed it
+    const supabase = createClient();
+    const { data: refreshed } = await supabase
+      .from("wl_families")
+      .select("priority_status, priority_rank")
+      .eq("id", familyInfo.id)
+      .single();
+
+    // Update panel local state
+    setFamilyInfo((prev) => prev ? { ...prev, parents: updatedParents } : prev);
+
+    // Push refreshed priority back to the Waitlist table row
+    onSave({
+      ...item,
+      priority_status: refreshed?.priority_status ?? item.priority_status,
+      priority_rank:   (refreshed?.priority_rank as number | null | undefined) ?? item.priority_rank,
+    });
+
+    setIsEditingParents(false);
+    setParentForm([]);
+    setSavingParents(false);
   }
 
   // Cycle a task's status: To Do → Doing → Done → To Do
@@ -384,7 +555,7 @@ export function ChildDetailPanel({
       <div
         role="dialog"
         aria-label={`Details for ${item.child_full_name}`}
-        className="fixed right-0 top-0 h-full w-[400px] bg-surface border-l border-border z-50 shadow-2xl flex flex-col"
+        className="fixed right-0 top-0 h-full w-[440px] bg-surface border-l border-border z-50 shadow-2xl flex flex-col"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-5 border-b border-border flex-shrink-0">
@@ -572,53 +743,208 @@ export function ChildDetailPanel({
                 <p className="text-[12px] text-text-3 italic">Loading family…</p>
               ) : familyInfo ? (
                 <>
-                  <Field label="Parents">
-                    {familyInfo.parents.length === 0 ? (
-                      <p className="text-[13px] text-text-3 italic">None on record</p>
-                    ) : (
+                  {/* ── Parents — section-level edit ── */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-3">
+                        Parents
+                      </div>
+                      {canEdit && !isEditing && !isEditingParents && (
+                        <button
+                          onClick={startEditParents}
+                          className="text-[11.5px] text-text-3 hover:text-text transition-colors"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+
+                    {isEditingParents ? (
+                      /* ── Edit mode ── */
                       <div className="space-y-3">
-                        {[...familyInfo.parents]
-                          .sort((a, b) => {
-                            if (a.primary_contact !== b.primary_contact)
-                              return a.primary_contact ? -1 : 1;
-                            return `${a.first_name} ${a.last_name}`.localeCompare(
-                              `${b.first_name} ${b.last_name}`
-                            );
-                          })
-                          .map((p) => (
-                            <div key={p.id} className="space-y-0.5">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-serif text-[14px] font-medium text-text">
-                                  {p.first_name} {p.last_name}
-                                </span>
-                                {p.primary_contact && (
-                                  <span className="font-mono text-[10px] uppercase tracking-wide text-text-3">
-                                    primary
-                                  </span>
-                                )}
-                                {p.school_history && (
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium ${
-                                    p.school_history === "Board"
-                                      ? "bg-terra-soft text-terra"
-                                      : p.school_history === "Teacher"
-                                      ? "bg-green-soft text-green-deep"
-                                      : "bg-gold-soft text-gold"
-                                  }`}>
-                                    {p.school_history}
-                                  </span>
-                                )}
-                              </div>
-                              {p.email && (
-                                <p className="text-[12.5px] text-text-2">{p.email}</p>
-                              )}
-                              {p.phone && (
-                                <p className="font-mono text-[12px] text-text-2">{p.phone}</p>
+                        {deleteParentErr && (
+                          <p className="text-[12px] text-terra">{deleteParentErr}</p>
+                        )}
+
+                        {parentForm.map((p) => (
+                          <div key={p._key} className="rounded-xl border border-border p-3.5 space-y-2 bg-surface-warm">
+                            {/* Name */}
+                            <div className="flex gap-2">
+                              <input
+                                value={p.first_name}
+                                onChange={(e) => setParentField(p._key, "first_name", e.target.value)}
+                                placeholder="First name"
+                                className={inputCls}
+                              />
+                              <input
+                                value={p.last_name}
+                                onChange={(e) => setParentField(p._key, "last_name", e.target.value)}
+                                placeholder="Last name"
+                                className={inputCls}
+                              />
+                            </div>
+
+                            {/* Email */}
+                            <input
+                              type="email"
+                              value={p.email}
+                              onChange={(e) => setParentField(p._key, "email", e.target.value)}
+                              placeholder="Email"
+                              className={inputCls}
+                            />
+
+                            {/* Phone */}
+                            <input
+                              type="tel"
+                              value={p.phone}
+                              onChange={(e) => setParentField(p._key, "phone", e.target.value)}
+                              placeholder="Phone"
+                              className={inputCls}
+                            />
+
+                            {/* Primary contact + school history + delete */}
+                            <div className="flex items-center gap-3 pt-0.5">
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <div className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+                                  p.primary_contact ? "bg-green border-green" : "border-border-strong bg-surface"
+                                }`}>
+                                  {p.primary_contact && (
+                                    <svg viewBox="0 0 10 8" fill="none" className="w-2 h-2">
+                                      <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  className="sr-only"
+                                  checked={p.primary_contact}
+                                  onChange={() => setParentField(p._key, "primary_contact", !p.primary_contact)}
+                                />
+                                <span className="text-[12px] text-text-2">Primary</span>
+                              </label>
+
+                              <select
+                                value={p.school_history}
+                                onChange={(e) => setParentField(p._key, "school_history", e.target.value)}
+                                className="flex-1 px-2.5 py-1.5 bg-surface border border-border rounded-lg text-[12px] text-text focus:outline-none focus:border-green transition-colors appearance-none cursor-pointer pr-6"
+                                style={selectStyle}
+                              >
+                                <option value="">No history</option>
+                                <option value="Board">Board</option>
+                                <option value="Teacher">Teacher</option>
+                                <option value="Alumni">Alumni</option>
+                              </select>
+
+                              {confirmDeleteKey === p._key ? (
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <span className="text-[11.5px] text-terra font-medium">Delete?</span>
+                                  <button
+                                    onClick={() => handleDeleteParent(p)}
+                                    className="text-[11.5px] text-terra font-semibold hover:underline"
+                                  >
+                                    Yes
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteKey(null)}
+                                    className="text-[11.5px] text-text-3 hover:underline"
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmDeleteKey(p._key)}
+                                  className="flex-shrink-0 text-[12px] text-text-3 hover:text-terra transition-colors"
+                                >
+                                  Delete
+                                </button>
                               )}
                             </div>
-                          ))}
+                          </div>
+                        ))}
+
+                        {/* Add parent */}
+                        <button
+                          onClick={addNewParent}
+                          className="flex items-center gap-1.5 text-[12.5px] text-green hover:text-green-deep font-medium transition-colors"
+                        >
+                          <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+                            <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+                          </svg>
+                          Add parent
+                        </button>
+
+                        {parentSaveError && (
+                          <p className="text-[12px] text-terra">{parentSaveError}</p>
+                        )}
+
+                        {/* Save / Cancel */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={handleSaveParents}
+                            disabled={savingParents}
+                            className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-green hover:bg-green-deep transition-colors disabled:opacity-50"
+                          >
+                            {savingParents ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            onClick={handleCancelParents}
+                            disabled={savingParents}
+                            className="text-[12.5px] text-text-3 hover:text-text transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
+                    ) : (
+                      /* ── View mode ── */
+                      familyInfo.parents.length === 0 ? (
+                        <p className="text-[13px] text-text-3 italic">None on record</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {[...familyInfo.parents]
+                            .sort((a, b) => {
+                              if (a.primary_contact !== b.primary_contact)
+                                return a.primary_contact ? -1 : 1;
+                              return `${a.first_name} ${a.last_name}`.localeCompare(
+                                `${b.first_name} ${b.last_name}`
+                              );
+                            })
+                            .map((p) => (
+                              <div key={p.id} className="space-y-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-serif text-[14px] font-medium text-text">
+                                    {p.first_name} {p.last_name}
+                                  </span>
+                                  {p.primary_contact && (
+                                    <span className="font-mono text-[10px] uppercase tracking-wide text-text-3">
+                                      primary
+                                    </span>
+                                  )}
+                                  {p.school_history && (
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium ${
+                                      p.school_history === "Board"
+                                        ? "bg-terra-soft text-terra"
+                                        : p.school_history === "Teacher"
+                                        ? "bg-green-soft text-green-deep"
+                                        : "bg-gold-soft text-gold"
+                                    }`}>
+                                      {p.school_history}
+                                    </span>
+                                  )}
+                                </div>
+                                {p.email && (
+                                  <p className="text-[12.5px] text-text-2">{p.email}</p>
+                                )}
+                                {p.phone && (
+                                  <p className="font-mono text-[12px] text-text-2">{p.phone}</p>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      )
                     )}
-                  </Field>
+                  </div>
 
                   {(() => {
                     const siblings = familyInfo.children.filter(
