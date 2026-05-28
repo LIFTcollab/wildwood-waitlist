@@ -221,6 +221,7 @@ export function ChildDetailPanel({
   // Fetch family info whenever the selected child changes
   useEffect(() => {
     if (!item?.child_id) { setFamilyInfo(null); return; }
+    setFamilyInfo(null);   // clear stale data immediately before fetch
     setFamilyLoading(true);
     const supabase = createClient();
     (async () => {

@@ -45,20 +45,6 @@ export async function createFamily(
   return { error: null, id: data.id };
 }
 
-export async function updateFamilyName(
-  id: string,
-  name: string
-): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("wl_families")
-    .update({ name })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/settings");
-  return { error: null };
-}
-
 export async function updateParent(
   id: string,
   data: ParentData
@@ -70,6 +56,7 @@ export async function updateParent(
     .eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/settings");
+  revalidatePath("/waitlist");
   return { error: null };
 }
 
@@ -86,6 +73,7 @@ export async function addParent(
     .single();
   if (error) return { error: error.message, id: null };
   revalidatePath("/settings");
+  revalidatePath("/waitlist");
   return { error: null, id: result.id };
 }
 
@@ -96,6 +84,7 @@ export async function deleteParent(
   const { error } = await supabase.from("wl_parents").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/settings");
+  revalidatePath("/waitlist");
   return { error: null };
 }
 

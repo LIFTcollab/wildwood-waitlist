@@ -318,6 +318,19 @@ export function FamilyDetailPanel({
     }));
   }
 
+  async function fetchPriority(familyId: string) {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("wl_families")
+      .select("priority_status, priority_rank")
+      .eq("id", familyId)
+      .single();
+    return {
+      priority_status: (data?.priority_status as string | null) ?? null,
+      priority_rank:   (data?.priority_rank   as number | null) ?? null,
+    };
+  }
+
   async function handleRemoveParent(p: ParentForm) {
     setRemoveErr(null);
     if (p.id === null) {
@@ -351,10 +364,13 @@ export function FamilyDetailPanel({
       parents: prev.parents.filter((fp) => fp._key !== p._key),
     }));
     setConfirmKey(null);
-    // Sync table row using the captured list (not stale `family` closure)
+    // Sync table row — re-fetch priority since removing a parent may change it
     if (family) {
+      const priority = await fetchPriority(family.id);
       onUpdate(family.id, {
-        name:    computeFamilyName(remainingParents, family.name),
+        name:            computeFamilyName(remainingParents, family.name),
+        priority_status: priority.priority_status,
+        priority_rank:   priority.priority_rank,
         parents: remainingParents.map((fp) => ({
           id:              fp.id,
           first_name:      fp.first_name,
@@ -447,8 +463,11 @@ export function FamilyDetailPanel({
     setParentFamilySearch("");
     setParentMoving(false);
     if (family) {
+      const priority = await fetchPriority(family.id);
       onUpdate(family.id, {
-        name:    computeFamilyName(remaining, family.name),
+        name:            computeFamilyName(remaining, family.name),
+        priority_status: priority.priority_status,
+        priority_rank:   priority.priority_rank,
         parents: remaining.map((fp) => ({
           id:              fp.id,
           first_name:      fp.first_name,
@@ -510,8 +529,11 @@ export function FamilyDetailPanel({
     setCreatingFamily(false);
 
     if (family) {
+      const priority = await fetchPriority(family.id);
       onUpdate(family.id, {
-        name:    computeFamilyName(remaining, family.name),
+        name:            computeFamilyName(remaining, family.name),
+        priority_status: priority.priority_status,
+        priority_rank:   priority.priority_rank,
         parents: remaining.map((fp) => ({
           id:              fp.id,
           first_name:      fp.first_name,
