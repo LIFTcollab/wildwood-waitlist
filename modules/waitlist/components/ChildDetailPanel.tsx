@@ -537,8 +537,8 @@ export function ChildDetailPanel({
             )}
           </Field>
 
-          {/* Entry notes (waitlist_items.notes — specific to this term entry) */}
-          <Field label="Entry notes">
+          {/* Waitlist notes (waitlist_items.notes — specific to this term entry) */}
+          <Field label="Waitlist notes">
             {isEditing ? (
               <textarea
                 value={form.notes}
