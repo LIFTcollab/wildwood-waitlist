@@ -15,8 +15,13 @@ import {
 type NameValue = { name: string; value: number };
 type NameValueColor = NameValue & { color: string };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ChartTooltip({ active, payload, label }: any) {
+type ChartTooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: { name?: string; value?: number | string }[];
+};
+
+function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
   const name = label || payload[0].name;
   return (

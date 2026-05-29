@@ -81,5 +81,6 @@ export async function createTask(
     .single();
 
   revalidatePath("/waitlist");
+  revalidatePath("/dashboard");
   return { error: null, taskId: data.id, taskName: task?.task_name ?? null };
 }

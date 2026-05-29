@@ -21,5 +21,6 @@ export async function updateTask(
 
   if (error) return { error: error.message };
   revalidatePath("/dashboard");
+  revalidatePath("/waitlist");
   return { error: null };
 }

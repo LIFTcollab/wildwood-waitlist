@@ -45,6 +45,10 @@ export async function proxy(request: NextRequest) {
    */
   function buildRequestHeaders(): Headers {
     const headers = new Headers(request.headers);
+    // Always strip any client-supplied value first so x-org-slug can only ever
+    // be set by this proxy from the request host — never spoofed by the caller
+    // (it would otherwise pass through on the apex domain, where orgSlug is null).
+    headers.delete("x-org-slug");
     if (orgSlug) headers.set("x-org-slug", orgSlug);
     return headers;
   }

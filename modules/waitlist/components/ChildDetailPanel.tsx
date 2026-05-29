@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/modules/waitlist/types";
 import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
 import { updateWaitlistItem, createTask } from "@/modules/waitlist/lib/actions/waitlist";
+import { updateTask } from "@/modules/waitlist/lib/actions/tasks";
 import { updateParent, addParent, deleteParent, type ParentData } from "@/modules/waitlist/lib/actions/families";
 import { createClient } from "@/lib/supabase/client";
 
@@ -455,20 +456,22 @@ export function ChildDetailPanel({
   // Cycle a task's status: To Do → Doing → Done → To Do
   async function cycleTaskStatus(taskId: string, currentStatus: string) {
     if (!canEdit) return;
+    const task = tasks.find((t) => t.task_id === taskId);
+    if (!task) return;
     const nextStatus = TASK_STATUS_NEXT[currentStatus] ?? "To Do";
     const prevTasks = tasks;
     // Optimistic update
     setTasks((prev) =>
       prev.map((t) => t.task_id === taskId ? { ...t, task_status: nextStatus } : t)
     );
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("wl_tasks")
-      .update({ status: nextStatus })
-      .eq("id", taskId);
+    const { error } = await updateTask(taskId, {
+      task_name:        task.task_name,
+      task_description: task.task_description,
+      task_status:      nextStatus,
+    });
     if (error) {
       setTasks(prevTasks);
-      setTaskError(error.message);
+      setTaskError(error);
     }
   }
 
@@ -510,6 +513,8 @@ export function ChildDetailPanel({
   async function saveTaskEdit(taskId: string) {
     const trimmed = editingText.trim();
     if (!trimmed) return;
+    const task = tasks.find((t) => t.task_id === taskId);
+    if (!task) return;
     const prevTasks = tasks;
     const prevEditingText = editingText;
     // Optimistic update
@@ -518,17 +523,17 @@ export function ChildDetailPanel({
     );
     setEditingTaskId(null);
     setEditingText("");
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("wl_tasks")
-      .update({ description: trimmed })
-      .eq("id", taskId);
+    const { error } = await updateTask(taskId, {
+      task_name:        task.task_name,
+      task_description: trimmed,
+      task_status:      task.task_status,
+    });
     if (error) {
       // Rollback — reopen the edit so the user can try again
       setTasks(prevTasks);
       setEditingTaskId(taskId);
       setEditingText(prevEditingText);
-      setTaskError(error.message);
+      setTaskError(error);
     }
   }
 
