@@ -111,23 +111,6 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      {/* Topbar */}
-      <div className="h-[52px] px-7 bg-bg border-b border-border flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 text-[13px] text-text-2">
-          <span>Wildwood</span>
-          <span className="text-text-3">/</span>
-          <span className="text-text font-medium">Dashboard</span>
-        </div>
-        <div className="flex gap-1.5 items-center">
-          <button className="inline-flex items-center px-3 py-1.5 text-[12.5px] font-medium border border-border-strong rounded-md bg-surface hover:bg-surface-warm transition-colors text-text">
-            Export
-          </button>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium bg-green text-white rounded-md hover:bg-green-deep transition-colors">
-            + Add child
-          </button>
-        </div>
-      </div>
-
       {/* Content */}
       <div className="px-7 py-6 max-w-[1500px]">
         {/* Heading */}
