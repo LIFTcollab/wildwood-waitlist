@@ -20,6 +20,19 @@ export async function updateWaitlistItem(
   data: WaitlistItemUpdate
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can edit waitlist entries" };
+
   const { error } = await supabase
     .from("waitlist_items_view")
     .update(data)
@@ -27,6 +40,7 @@ export async function updateWaitlistItem(
 
   if (error) return { error: error.message };
   revalidatePath("/waitlist");
+  revalidatePath("/dashboard");
   return { error: null };
 }
 

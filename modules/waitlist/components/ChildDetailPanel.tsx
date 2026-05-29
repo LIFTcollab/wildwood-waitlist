@@ -1071,25 +1071,27 @@ export function ChildDetailPanel({
                       );
                     })}
 
-                    {/* Add task input */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <input
-                        type="text"
-                        value={newTaskName}
-                        onChange={(e) => setNewTaskName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleAddTask(); }}
-                        placeholder="Describe the task…"
-                        disabled={addingTask}
-                        className="flex-1 px-2.5 py-1.5 bg-surface-warm border border-border rounded-lg text-[12.5px] text-text placeholder:text-text-3 focus:outline-none focus:border-green transition-colors disabled:opacity-50"
-                      />
-                      <button
-                        onClick={handleAddTask}
-                        disabled={!newTaskName.trim() || addingTask}
-                        className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-green hover:bg-green-deep transition-colors disabled:opacity-40 disabled:cursor-default"
-                      >
-                        {addingTask ? "…" : "Add"}
-                      </button>
-                    </div>
+                    {/* Add task input — editors only */}
+                    {canEdit && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={newTaskName}
+                          onChange={(e) => setNewTaskName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleAddTask(); }}
+                          placeholder="Describe the task…"
+                          disabled={addingTask}
+                          className="flex-1 px-2.5 py-1.5 bg-surface-warm border border-border rounded-lg text-[12.5px] text-text placeholder:text-text-3 focus:outline-none focus:border-green transition-colors disabled:opacity-50"
+                        />
+                        <button
+                          onClick={handleAddTask}
+                          disabled={!newTaskName.trim() || addingTask}
+                          className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-green hover:bg-green-deep transition-colors disabled:opacity-40 disabled:cursor-default"
+                        >
+                          {addingTask ? "…" : "Add"}
+                        </button>
+                      </div>
+                    )}
 
                     {taskError && (
                       <p className="text-[12px] text-terra">{taskError}</p>

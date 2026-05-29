@@ -612,10 +612,14 @@ $$;
 
 -- update_waitlist_items_view()
 -- INSTEAD OF UPDATE trigger for waitlist_items_view.
+-- SECURITY INVOKER so base-table RLS applies on the caller's behalf — must NOT
+-- be SECURITY DEFINER, or read-only Viewers can write through the view and
+-- bypass the Admin/Director-only UPDATE policies. (Fixed 2026-05-28; see
+-- migrations/security_fix_waitlist_view_trigger_invoker.sql.)
 CREATE OR REPLACE FUNCTION public.update_waitlist_items_view()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = ''
 AS $$
 DECLARE
@@ -1221,6 +1225,19 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text)     TO authenticated;
 --                 no longer exists; task_name is read-only / view-computed).
 --             [4] createTask server action reads task_name back from the view
 --                 after insert for the optimistic UI update.
+--
+-- 2026-05-28  Security fix — update_waitlist_items_view() → SECURITY INVOKER:
+--             The INSTEAD OF UPDATE trigger function on waitlist_items_view was
+--             SECURITY DEFINER, so its inner UPDATEs on wl_waitlist_items and
+--             wl_children bypassed RLS. Any authenticated user (incl. read-only
+--             Viewers) could write through the view, defeating the
+--             Admin/Director-only base-table UPDATE policies — exploitable
+--             directly via PostgREST, not just the updateWaitlistItem server
+--             action. Flipped to SECURITY INVOKER (body unchanged) so base-table
+--             RLS applies to the caller, matching fn_update_task_from_view().
+--             Also added a defense-in-depth auth + role check to the
+--             updateWaitlistItem server action.
+--             Migration: migrations/security_fix_waitlist_view_trigger_invoker.sql
 --
 -- =============================================================================
 -- END OF SCHEMA DOCUMENT
