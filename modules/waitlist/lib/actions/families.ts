@@ -50,6 +50,19 @@ export async function updateParent(
   data: ParentData
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can edit parents" };
+
   const { error } = await supabase
     .from("wl_parents")
     .update(data)
@@ -62,13 +75,37 @@ export async function updateParent(
 
 export async function addParent(
   familyId: string,
-  organizationId: string,
   data: ParentData
 ): Promise<{ error: string | null; id: string | null }> {
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated", id: null };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("organization_id, role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can add parents", id: null };
+
+  if (!profile?.organization_id)
+    return { error: "No organization found for your account", id: null };
+
+  // Verify the target family belongs to the caller's org before inserting.
+  const { count } = await supabase
+    .from("wl_families")
+    .select("id", { count: "exact", head: true })
+    .eq("id", familyId)
+    .eq("organization_id", profile.organization_id);
+
+  if (!count) return { error: "Family not found", id: null };
+
   const { data: result, error } = await supabase
     .from("wl_parents")
-    .insert({ family_id: familyId, organization_id: organizationId, ...data })
+    .insert({ family_id: familyId, organization_id: profile.organization_id, ...data })
     .select("id")
     .single();
   if (error) return { error: error.message, id: null };
@@ -81,6 +118,19 @@ export async function deleteParent(
   id: string
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can delete parents" };
+
   const { error } = await supabase.from("wl_parents").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/settings");

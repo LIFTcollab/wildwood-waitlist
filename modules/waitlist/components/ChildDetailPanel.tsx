@@ -409,7 +409,7 @@ export function ChildDetailPanel({
     // Insert new parents sequentially (need returned ids)
     const newParentIds: Record<string, string> = {};
     for (const p of parentForm.filter((fp) => fp.id === null)) {
-      const r = await addParent(familyInfo.id, familyInfo.organization_id, formToParentData(p));
+      const r = await addParent(familyInfo.id, formToParentData(p));
       if (r.error) {
         setParentSaveError(r.error);
         setSavingParents(false);

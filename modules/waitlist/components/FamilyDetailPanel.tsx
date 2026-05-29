@@ -584,7 +584,6 @@ export function FamilyDetailPanel({
     for (const p of form.parents.filter((fp) => fp.id === null)) {
       const r = await addParent(
         family.id,
-        family.organization_id,
         formToParentData(p)
       );
       if (r.error) {

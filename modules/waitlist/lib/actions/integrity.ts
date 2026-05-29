@@ -17,6 +17,18 @@ export async function checkDataIntegrity(): Promise<{
 }> {
   const supabase = await createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { issues: [], error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { issues: [], error: "Insufficient permissions" };
+
   const { data, error } = await supabase
     .from("data_integrity_issues")
     .select("issue_type, severity, description, family_id, family_name, entity_id")

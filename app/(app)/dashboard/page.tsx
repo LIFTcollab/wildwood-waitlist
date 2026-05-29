@@ -32,6 +32,14 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const canEdit = ["Admin", "Director"].includes(profile?.role ?? "");
+
   const [
     { data: terms },
     { data: waitlistItems },
@@ -183,7 +191,7 @@ export default async function DashboardPage() {
           <h2 className="font-serif text-[19px] font-medium text-text">Open tasks</h2>
           <span className="font-mono text-[12px] text-text-3">{open} remaining</span>
         </div>
-        <OpenTasksTable tasks={(taskRows ?? []) as TaskRow[]} />
+        <OpenTasksTable tasks={(taskRows ?? []) as TaskRow[]} canEdit={canEdit} />
       </div>
     </div>
   );

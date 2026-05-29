@@ -198,7 +198,7 @@ function EditModal({
 
 const DEFAULT_FILTER: TaskStatus[] = ["To Do", "Doing"];
 
-export function OpenTasksTable({ tasks: initialTasks }: { tasks: TaskRow[] }) {
+export function OpenTasksTable({ tasks: initialTasks, canEdit }: { tasks: TaskRow[]; canEdit: boolean }) {
   const [tasks,          setTasks]          = useState<TaskRow[]>(initialTasks);
   const [editing,        setEditing]        = useState<TaskRow | null>(null);
   const [filterStatuses, setFilterStatuses] = useState<TaskStatus[]>(DEFAULT_FILTER);
@@ -293,21 +293,23 @@ export function OpenTasksTable({ tasks: initialTasks }: { tasks: TaskRow[] }) {
                     )}
                   </td>
                   <td className="px-5 py-3 align-top text-right">
-                    <button
-                      onClick={() => setEditing(task)}
-                      className="p-1 rounded text-text-3 hover:text-text hover:bg-surface-hover transition-colors"
-                      aria-label={`Edit task: ${task.task_name}`}
-                    >
-                      <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5">
-                        <path
-                          d="M9.5 1.5l3 3L4 13H1v-3L9.5 1.5z"
-                          stroke="currentColor"
-                          strokeWidth="1.4"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => setEditing(task)}
+                        className="p-1 rounded text-text-3 hover:text-text hover:bg-surface-hover transition-colors"
+                        aria-label={`Edit task: ${task.task_name}`}
+                      >
+                        <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5">
+                          <path
+                            d="M9.5 1.5l3 3L4 13H1v-3L9.5 1.5z"
+                            stroke="currentColor"
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
