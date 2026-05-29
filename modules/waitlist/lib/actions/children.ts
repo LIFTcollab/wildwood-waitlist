@@ -55,6 +55,15 @@ export async function createWaitlistEntry(
     if (famErr || !fam)
       return { error: famErr?.message ?? "Failed to create family", item: null };
     familyId = fam.id as string;
+  } else {
+    // Verify the supplied family belongs to the caller's org before linking a
+    // new child to it — the client-supplied familyId is otherwise untrusted.
+    const { count } = await supabase
+      .from("wl_families")
+      .select("id", { count: "exact", head: true })
+      .eq("id", familyId)
+      .eq("organization_id", orgId);
+    if (!count) return { error: "Family not found", item: null };
   }
 
   // ── 2. Create child ───────────────────────────────────────────────────────

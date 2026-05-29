@@ -1,0 +1,24 @@
+-- =============================================================================
+-- SECURITY FIX — update_waitlist_items_view() trigger → SECURITY INVOKER
+-- Applied: 2026-05-28  (Supabase project qxpftvnxorzwmawzhcjo)
+-- =============================================================================
+-- Problem:
+--   waitlist_items_view is security_invoker, but its INSTEAD OF UPDATE trigger
+--   function update_waitlist_items_view() was SECURITY DEFINER. The inner
+--   UPDATEs on wl_waitlist_items and wl_children therefore ran as the table
+--   owner and BYPASSED RLS — so any authenticated user (including read-only
+--   Viewers) could write through the view, defeating the Admin/Director-only
+--   UPDATE policies on the base tables. Reachable directly via PostgREST
+--   (PATCH /rest/v1/waitlist_items_view), not only via the server action.
+--
+-- Fix:
+--   Flip the function to SECURITY INVOKER so base-table RLS applies to the
+--   caller, matching the companion fn_update_task_from_view(). The function
+--   body is unchanged; ALTER FUNCTION only changes the security attribute.
+--
+-- Verify:
+--   select prosecdef from pg_proc where proname = 'update_waitlist_items_view';
+--   -- expect: false
+-- =============================================================================
+
+ALTER FUNCTION public.update_waitlist_items_view() SECURITY INVOKER;

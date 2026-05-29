@@ -195,12 +195,27 @@ export async function moveParentToFamily(
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role")
+    .select("organization_id, role")
     .eq("id", user.id)
     .single();
 
   if (!["Admin", "Director"].includes(profile?.role ?? ""))
     return { error: "Only Admins and Directors can reassign parents" };
+
+  if (!profile?.organization_id)
+    return { error: "No organization found for your account" };
+
+  // Verify the target family belongs to the caller's org before reassigning.
+  // RLS on wl_parents only checks the row's own org (unchanged here), so without
+  // this a foreign family_id would be accepted — and the SECURITY DEFINER
+  // priority/name recompute triggers would then write to that other org's family.
+  const { count } = await supabase
+    .from("wl_families")
+    .select("id", { count: "exact", head: true })
+    .eq("id", familyId)
+    .eq("organization_id", profile.organization_id);
+
+  if (!count) return { error: "Family not found" };
 
   const { error } = await supabase
     .from("wl_parents")
@@ -210,6 +225,7 @@ export async function moveParentToFamily(
   if (error) return { error: error.message };
 
   revalidatePath("/settings");
+  revalidatePath("/waitlist");
   return { error: null };
 }
 
@@ -224,12 +240,25 @@ export async function moveChildToFamily(
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role")
+    .select("organization_id, role")
     .eq("id", user.id)
     .single();
 
   if (!["Admin", "Director"].includes(profile?.role ?? ""))
     return { error: "Only Admins and Directors can reassign children" };
+
+  if (!profile?.organization_id)
+    return { error: "No organization found for your account" };
+
+  // Verify the target family belongs to the caller's org before reassigning
+  // (see moveParentToFamily — guards against cross-tenant family_id linkage).
+  const { count } = await supabase
+    .from("wl_families")
+    .select("id", { count: "exact", head: true })
+    .eq("id", familyId)
+    .eq("organization_id", profile.organization_id);
+
+  if (!count) return { error: "Family not found" };
 
   const { error } = await supabase
     .from("wl_children")
