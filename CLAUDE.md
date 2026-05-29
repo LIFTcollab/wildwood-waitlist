@@ -8,7 +8,7 @@ Context for Claude Code sessions. Keep this file current — update it when we e
 
 A staff-facing waitlist management tool for **Wildwood** (nature-based preschool), built as the first module (`wl_`) of the **LiftCollab** multi-tenant nonprofit platform.
 
-- **Live app:** https://wildwood.liftcollab.org
+- **Live app:** https://wildwood.liftcollab.app (wildwood.liftcollab.org redirects here)
 - **Supabase project:** `qxpftvnxorzwmawzhcjo`
 - **Vercel project:** wildwood.vercel.app (auto-deploys on push to `main`)
 
@@ -88,10 +88,12 @@ wildwood-waitlist/
 │       │   ├── terms.ts               # createTerm, updateTerm, deleteTerm
 │       │   └── integrity.ts           # checkDataIntegrity
 │       └── types/index.ts             # WaitlistItem, SchoolTerm types
-├── lib/supabase/
-│   ├── client.ts                      # Browser client
-│   └── server.ts                      # Server client (cookies)
-├── middleware.ts                      # Session refresh (every request)
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts                  # Browser client
+│   │   └── server.ts                  # Server client (cookies)
+│   └── org-context.ts                 # getOrgSlug() — reads x-org-slug header set by proxy
+├── proxy.ts                           # Subdomain routing + session refresh (Next.js 16 "proxy")
 ├── reference/
 │   ├── wildwood_schema.sql            # Authoritative DB schema + change log
 │   └── wildwood-hybrid.html          # Design reference — open to see the look
@@ -131,7 +133,7 @@ const supabase = createClient();
 
 ### Server Actions
 
-- All DB mutations go in `app/actions/*.ts` (or `app/actions/<module>/` as modules grow).
+- All DB mutations go in `modules/<module>/lib/actions/*.ts`.
 - Always start with `supabase.auth.getUser()` and check for auth.
 - Role check: read from `user_profiles.organization_id` (never from request params or body).
 - Return `{ error: string | null }` + data when needed.
@@ -224,12 +226,12 @@ CREATE POLICY "Admins/Directors can insert" ON public.your_table FOR INSERT TO a
 
 ## Database Overview
 
-9 tables, 3 views, RLS on everything.
+11 tables, 4 views, RLS on everything.
 Full schema in `reference/wildwood_schema.sql`.
 
-**Tables:** `organizations`, `families`, `children`, `parents`, `school_terms`, `waitlist_items`, `tasks`, `user_profiles`, `rate_limit_log`
+**Tables:** `organizations`, `modules`, `organization_modules`, `wl_families`, `wl_children`, `wl_parents`, `wl_school_terms`, `wl_waitlist_items`, `wl_tasks`, `user_profiles`, `rate_limit_log`
 
-**Views:** `waitlist_items_view`, `waitlist_tasks_view`, `user_profiles_view`
+**Views:** `waitlist_items_view`, `waitlist_tasks_view`, `user_profiles_view`, `data_integrity_issues`
 
 **RLS helpers:**
 - `current_user_org()` — SECURITY DEFINER, returns caller's `organization_id`
@@ -294,21 +296,16 @@ npm run build    # type-check + production build
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://qxpftvnxorzwmawzhcjo.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<from Supabase Dashboard>
+NEXT_PUBLIC_DEFAULT_ORG_SLUG=wildwood   # used on plain localhost (no subdomain)
 ```
 
 ---
 
-## Current Phase: Phase 2 — Subdomain Routing & Domain Migration
+## Current Phase: Phase 3 — Program Management Module
 
-Phase 1 complete. Now migrating from `wildwood.liftcollab.org` to `wildwood.liftcollab.app`
-with proper subdomain-based tenant routing. See ROADMAP.md for the full sequence.
-
-**Phase 2 tasks (in order):**
-1. Implement subdomain middleware — reads subdomain, looks up org by slug, sets org context
-2. Add `wildwood.liftcollab.app` domain in Vercel
-3. Configure Cloudflare DNS (CNAME → Vercel, DNS-only / gray cloud)
-4. Test thoroughly — auth, data isolation, subdomain context
-5. Redirect `wildwood.liftcollab.org` → `wildwood.liftcollab.app`
+Phases 1 and 2 complete. App live at `wildwood.liftcollab.app` with subdomain routing.
+Now building the program management module to support LIFT's collective impact partnerships.
+See ROADMAP.md for the full sequence.
 
 **Not yet built (Phases 3+):**
 - Program management module (`pm_`)
@@ -321,7 +318,7 @@ Full platform architecture in ARCHITECTURE.md and CONVENTIONS.md.
 
 ## Known Gotchas
 
-- **Magic link redirect URL must be in Supabase's allowed list.** Both `localhost:3000/auth/callback` and the Vercel production URL.
+- **Magic link redirect URL must be in Supabase's allowed list.** `wildwood.liftcollab.app/auth/callback`, `wildwood.liftcollab.org/auth/callback`, and `localhost:3000/auth/callback` are all in the allowlist. Supabase Site URL is `https://wildwood.liftcollab.app`.
 - **RLS errors look like empty results.** If a query returns `[]` unexpectedly, check auth + policy — Supabase hides rows silently.
 - **`42501` = missing GRANT, not an RLS issue.** Run the three-step new-table pattern.
 - **`NEXT_PUBLIC_` vars must NOT be Sensitive in Vercel** — they're baked in at build time.
@@ -339,7 +336,7 @@ Append decisions and notes here chronologically. Most recent at bottom.
 - *Pre-build:* DB schema designed and secured. RLS policies, anon-revocation, with-check constraints, rate-limit hardening, user_profiles_view restriction, search_path hardening, and pg_cron cleanup job all applied. Schema documented in `reference/wildwood_schema.sql`.
 - *2026-05-12:* Opted in to Supabase's new restrictive default privileges. New tables in `public` now require explicit `GRANT` statements.
 - *2026-05-12:* Design direction finalized as hybrid editorial-operational. Three prototypes evaluated; final design combines warm palette, efficient table layouts, and visual metric components. Reference: `reference/wildwood-hybrid.html`. Typography: Source Serif 4 + Inter + JetBrains Mono. Primary accent: forest green `#4a7c59`.
-- *2026-05-24:* v1 shipped. Login + dashboard live at wildwood.vercel.app. All 9 BUILD_PLAN success criteria met. Renamed `proxy.ts` → `middleware.ts` (Vercel edge requires this name). `NEXT_PUBLIC_` vars must NOT be Sensitive in Vercel.
+- *2026-05-24:* v1 shipped. Login + dashboard live at wildwood.vercel.app. All 9 BUILD_PLAN success criteria met. `NEXT_PUBLIC_` vars must NOT be Sensitive in Vercel.
 - *2026-05-24:* `/waitlist` page shipped. Filterable/sortable table, priority-ranked default, 25-per-page pagination, slide-in detail panel with inline editing.
 - *2026-05-24:* Waitlist enhanced: inline editing (Admin/Director), column sorting, multi-select filter dropdowns with OR matching.
 - *2026-05-26:* Security hardening: 17 Supabase Advisor warnings → 6 (all intentional). Revoked EXECUTE on internal functions from PUBLIC. Split FOR ALL RLS policies into per-operation. Fixed auth.uid() per-row re-evaluation in user_profiles.
@@ -348,4 +345,4 @@ Append decisions and notes here chronologically. Most recent at bottom.
 - *2026-05-27:* Created `PROJECT.md` (current state), `CONVENTIONS.md` (multi-tenant platform architecture), and updated `CLAUDE.md`. Platform renamed to LiftCollab internally. Module prefix convention established (`wl_` for waitlist). Future architectural steps documented.
 - *2026-05-27:* Added `STRATEGY.md` (LIFT vision, Head/Heart/Hands, funder positioning, Wildwood origin story), `ARCHITECTURE.md` (multi-tenant DB schema, subdomain routing, code organization), and `ROADMAP.md` (5-phase implementation plan). CLAUDE.md updated to reflect Phase 1 as active work. CONVENTIONS.md reconciled against ARCHITECTURE.md.
 - *2026-05-27:* Phase 1 complete. Executed all steps: code into `/modules/waitlist/`, DB tables renamed to `wl_` prefix, `modules` and `organization_modules` tables added, `slug`/`type`/`domain` added to `organizations`. Regression testing found and fixed two bugs introduced by the table rename: (1) embedded join queries in FamilyDetailPanel/AddChildModal still used old table names — fixed with PostgREST alias syntax (`children:wl_children(...)`); (2) six trigger functions (`fn_recompute_family_priority`, `fn_recompute_family_name`, `fn_trg_waitlist_items_priority`, and wrappers) still referenced old table names, causing all `wl_parents` UPDATEs to silently roll back — fixed in `phase1_fix_trigger_functions.sql` migration. These functions were missing from the schema file and therefore not caught in the original rename migration.
-- *2026-05-28:* Post-Phase-1 feature work and bug fixes. Bug fixes: AddChild modal submit always disabled (term_id not pre-populated); task name incorrectly editable on dashboard; primary contact checkbox uncontrolled→controlled error + double-toggle bug; school history change not reflecting in Families table (added priority_status/rank re-fetch after save). Features: term deletion (Admin only, with guard); "New family" option in parent move picker; renamed "Remove" → "Delete" with stronger confirm copy; empty-family banner with delete prompt; orphaned_parent check added to `data_integrity_issues` DB view and DataIntegrityPanel; enriched family display in Waitlist panel (email, phone, school history badges); section-level parent editing in Waitlist panel (edit/add/delete parents without leaving the panel); Families page consolidated into Admin page (`/settings`) — nav simplified to Dashboard · Waitlist · Admin; `/families` redirects to `/settings`; `updateFamilyName` dead code removed. Four bugs fixed after code review: `updateParent`/`addParent`/`deleteParent` missing `revalidatePath("/waitlist")`; priority not refreshed after remove/move parent in FamilyDetailPanel; stale family data briefly shown on child switch; dead `updateFamilyName` action.
+- *2026-05-28:* Post-Phase-1 feature work and bug fixes (see prior entry). Phase 2 complete: `proxy.ts` implements subdomain routing (Next.js 16 renames middleware → proxy); `lib/org-context.ts` provides `getOrgSlug()` for server components; `next.config.ts` adds host-based 301 redirect from `.org` to `.app`; `NEXT_PUBLIC_DEFAULT_ORG_SLUG` added to env for local dev. Supabase Site URL updated to `wildwood.liftcollab.app`; auth callback allowlist updated. All 25 local commits pushed to GitHub; Vercel deployed current code. Both `wildwood.liftcollab.app` (canonical) and `wildwood.liftcollab.org` (redirects to `.app`) verified working. Bug fixes: AddChild modal submit always disabled (term_id not pre-populated); task name incorrectly editable on dashboard; primary contact checkbox uncontrolled→controlled error + double-toggle bug; school history change not reflecting in Families table (added priority_status/rank re-fetch after save). Features: term deletion (Admin only, with guard); "New family" option in parent move picker; renamed "Remove" → "Delete" with stronger confirm copy; empty-family banner with delete prompt; orphaned_parent check added to `data_integrity_issues` DB view and DataIntegrityPanel; enriched family display in Waitlist panel (email, phone, school history badges); section-level parent editing in Waitlist panel (edit/add/delete parents without leaving the panel); Families page consolidated into Admin page (`/settings`) — nav simplified to Dashboard · Waitlist · Admin; `/families` redirects to `/settings`; `updateFamilyName` dead code removed. Four bugs fixed after code review: `updateParent`/`addParent`/`deleteParent` missing `revalidatePath("/waitlist")`; priority not refreshed after remove/move parent in FamilyDetailPanel; stale family data briefly shown on child switch; dead `updateFamilyName` action.

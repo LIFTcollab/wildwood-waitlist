@@ -4,10 +4,10 @@ This roadmap sequences the work of evolving the Wildwood waitlist app into the L
 
 ## Current State
 
-- Wildwood waitlist app live at `wildwood.liftcollab.org`
-- Phase 1 complete — code and DB on multi-tenant, multi-module foundation
+- Wildwood waitlist app live at `wildwood.liftcollab.app` (wildwood.liftcollab.org redirects here)
+- Phases 1 and 2 complete — multi-tenant foundation + subdomain routing live
 - All tables prefixed `wl_`; `modules` and `organization_modules` tables seeded
-- App in active use; ongoing feature work running alongside Phase 2
+- App in active use; Phase 3 (program management) is next
 
 ## Phase 1 — Platform Foundation ✓ Complete
 
@@ -41,7 +41,7 @@ Establish the multi-tenant, multi-module foundation without breaking existing wa
 - Full test of waitlist functionality
 - Confirm no regressions
 
-## Phase 2 — Subdomain Routing & Domain Migration ← Active
+## Phase 2 — Subdomain Routing & Domain Migration ✓ Complete
 
 ### Goal
 Move from `wildwood.liftcollab.org` to `wildwood.liftcollab.app` with proper subdomain-based tenant routing.
@@ -71,7 +71,7 @@ Move from `wildwood.liftcollab.org` to `wildwood.liftcollab.app` with proper sub
 **2.5 Set Up Redirect**
 - Configure `wildwood.liftcollab.org` to permanently redirect to `wildwood.liftcollab.app`
 
-## Phase 3 — Program Management Module
+## Phase 3 — Program Management Module ← Active
 
 ### Goal
 Build the program management module to support LIFT's collective impact partnerships.
