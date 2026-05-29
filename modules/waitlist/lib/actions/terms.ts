@@ -66,8 +66,9 @@ export async function deleteTerm(
     .eq("id", user.id)
     .single();
 
-  if (!["Admin", "Director"].includes(profile?.role ?? ""))
-    return { error: "Only Admins and Directors can manage terms" };
+  // Term deletion is Admin-only (the UI only exposes it to Admins).
+  if (profile?.role !== "Admin")
+    return { error: "Only Admins can delete terms" };
 
   const { count } = await supabase
     .from("wl_waitlist_items")
