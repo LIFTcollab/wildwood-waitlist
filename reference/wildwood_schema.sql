@@ -812,6 +812,68 @@ BEGIN
 END;
 $$;
 
+-- wl_create_waitlist_entry()  [NEW 2026-05-28]
+-- Atomic "add child to waitlist": resolves/creates the family, creates the
+-- child, and creates the waitlist item in a single transaction so a partial
+-- failure cannot leave an orphaned family/child row. SECURITY INVOKER, so RLS
+-- and the role check apply to the caller. Verifies a supplied family_id belongs
+-- to the caller's org. Called by the createWaitlistEntry server action.
+-- See migrations/add_wl_create_waitlist_entry_rpc.sql for the full definition.
+CREATE OR REPLACE FUNCTION public.wl_create_waitlist_entry(
+  p_family_id uuid, p_family_name text, p_first_name text, p_last_name text,
+  p_dob date, p_term_id uuid, p_status text, p_classroom text,
+  p_date_applied date, p_notes text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_org    uuid := public.current_user_org();
+  v_role   public.user_role_enum := public.current_user_role();
+  v_family uuid := p_family_id;
+  v_child  uuid;
+  v_item   uuid;
+BEGIN
+  IF v_org IS NULL THEN
+    RAISE EXCEPTION 'No organization found for your account';
+  END IF;
+  IF v_role IS NULL OR v_role NOT IN ('Admin', 'Director') THEN
+    RAISE EXCEPTION 'Only Admins and Directors can add waitlist entries';
+  END IF;
+
+  IF v_family IS NULL THEN
+    INSERT INTO public.wl_families (name, organization_id)
+    VALUES (btrim(p_family_name), v_org)
+    RETURNING id INTO v_family;
+  ELSE
+    PERFORM 1 FROM public.wl_families
+      WHERE id = v_family AND organization_id = v_org;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Family not found';
+    END IF;
+  END IF;
+
+  INSERT INTO public.wl_children (first_name, last_name, dob, family_id, organization_id)
+  VALUES (btrim(p_first_name), btrim(p_last_name), p_dob, v_family, v_org)
+  RETURNING id INTO v_child;
+
+  INSERT INTO public.wl_waitlist_items
+    (child_id, term_id, organization_id, status, classroom, date_applied, notes)
+  VALUES (
+    v_child, p_term_id, v_org,
+    NULLIF(p_status, '')::public.waitlist_status_enum,
+    NULLIF(p_classroom, '')::public.classroom_enum,
+    p_date_applied, NULLIF(p_notes, '')
+  )
+  RETURNING id INTO v_item;
+
+  RETURN jsonb_build_object('item_id', v_item, 'child_id', v_child);
+END;
+$$;
+
+
 -- =============================================================================
 -- 8. TRIGGERS
 -- =============================================================================
@@ -1238,6 +1300,18 @@ GRANT EXECUTE ON FUNCTION public.check_email_exists(text)     TO authenticated;
 --             Also added a defense-in-depth auth + role check to the
 --             updateWaitlistItem server action.
 --             Migration: migrations/security_fix_waitlist_view_trigger_invoker.sql
+--
+-- 2026-05-28  Atomic add-child + cross-org guards:
+--             [1] Added wl_create_waitlist_entry() RPC (SECURITY INVOKER) so the
+--                 family/child/waitlist-item inserts run in one transaction —
+--                 fixes orphaned rows on partial failure. createWaitlistEntry
+--                 server action rewired to call it.
+--             [2] moveParentToFamily / moveChildToFamily now verify the target
+--                 family is in the caller's org before reassigning (matching
+--                 addParent) — closes a cross-tenant family_id linkage gap.
+--             [3] deleteTerm restricted to Admin only (was Admin OR Director),
+--                 matching the UI and CLAUDE.md.
+--             Migration: migrations/add_wl_create_waitlist_entry_rpc.sql
 --
 -- =============================================================================
 -- END OF SCHEMA DOCUMENT

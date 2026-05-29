@@ -27,80 +27,37 @@ export async function createWaitlistEntry(
 ): Promise<{ error: string | null; item: WaitlistItem | null }> {
   const supabase = await createClient();
 
-  // Resolve organization from the calling user's profile
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated", item: null };
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
+  // The family (resolve or create) → child → waitlist item are created
+  // atomically inside the wl_create_waitlist_entry RPC. It is SECURITY INVOKER,
+  // so base-table RLS and the Admin/Director role check still apply, and any
+  // mid-way failure rolls the whole thing back — no orphaned family/child rows.
+  // The RPC also verifies a supplied family belongs to the caller's org.
+  const { data: created, error: rpcErr } = await supabase.rpc(
+    "wl_create_waitlist_entry",
+    {
+      p_family_id:    input.familyId,
+      p_family_name:  input.familyName?.trim() ?? null,
+      p_first_name:   input.firstName.trim(),
+      p_last_name:    input.lastName.trim(),
+      p_dob:          input.dob || null,
+      p_term_id:      input.termId,
+      p_status:       input.status || "Waitlisted",
+      p_classroom:    input.classroom || null,
+      p_date_applied: input.dateApplied ? `${input.dateApplied}-01` : null,
+      p_notes:        input.notes || null,
+    }
+  );
 
-  if (!profile?.organization_id)
-    return { error: "No organization found for your account", item: null };
+  if (rpcErr) return { error: rpcErr.message, item: null };
 
-  const orgId = profile.organization_id as string;
+  const ids = created as { item_id: string; child_id: string } | null;
+  if (!ids?.item_id)
+    return { error: "Failed to create waitlist entry", item: null };
 
-  // ── 1. Resolve or create family ───────────────────────────────────────────
-  let familyId = input.familyId;
-  if (!familyId) {
-    const { data: fam, error: famErr } = await supabase
-      .from("wl_families")
-      .insert({ name: input.familyName!.trim(), organization_id: orgId })
-      .select("id")
-      .single();
-    if (famErr || !fam)
-      return { error: famErr?.message ?? "Failed to create family", item: null };
-    familyId = fam.id as string;
-  } else {
-    // Verify the supplied family belongs to the caller's org before linking a
-    // new child to it — the client-supplied familyId is otherwise untrusted.
-    const { count } = await supabase
-      .from("wl_families")
-      .select("id", { count: "exact", head: true })
-      .eq("id", familyId)
-      .eq("organization_id", orgId);
-    if (!count) return { error: "Family not found", item: null };
-  }
-
-  // ── 2. Create child ───────────────────────────────────────────────────────
-  const { data: child, error: childErr } = await supabase
-    .from("wl_children")
-    .insert({
-      first_name:      input.firstName.trim(),
-      last_name:       input.lastName.trim(),
-      dob:             input.dob || null,
-      family_id:       familyId,
-      organization_id: orgId,
-    })
-    .select("id")
-    .single();
-
-  if (childErr || !child)
-    return { error: childErr?.message ?? "Failed to create child", item: null };
-
-  // ── 3. Create waitlist item ───────────────────────────────────────────────
-  const { data: wi, error: wiErr } = await supabase
-    .from("wl_waitlist_items")
-    .insert({
-      child_id:        child.id,
-      term_id:         input.termId,
-      organization_id: orgId,
-      status:          input.status || "Waitlisted",
-      classroom:       input.classroom || null,
-      date_applied:    input.dateApplied ? `${input.dateApplied}-01` : null,
-      notes:           input.notes || null,
-    })
-    .select("id")
-    .single();
-
-  if (wiErr || !wi)
-    return { error: wiErr?.message ?? "Failed to create waitlist entry", item: null };
-
-  // ── 4. Fetch the full view row so the table can show it immediately ───────
+  // Fetch the full view row so the table can show it immediately.
   const { data: viewRow, error: viewErr } = await supabase
     .from("waitlist_items_view")
     .select(
@@ -108,18 +65,19 @@ export async function createWaitlistEntry(
       "priority_status, priority_rank, term_name, term_id, status, child_notes, " +
       "classroom, date_applied, notes, created_at"
     )
-    .eq("id", wi.id)
+    .eq("id", ids.item_id)
     .single();
 
   revalidatePath("/waitlist");
+  revalidatePath("/dashboard");
 
-  // If the view fetch fails after all 3 inserts succeeded, return a minimal
-  // item rather than an error — this prevents the caller from retrying and
-  // creating duplicate family/child/waitlist_item rows.
+  // If the view fetch fails after the entry was created, return a minimal item
+  // rather than an error — this prevents the caller from retrying and creating
+  // a duplicate entry.
   if (viewErr || !viewRow) {
     const fallback: WaitlistItem = {
-      id:              wi.id as string,
-      child_id:        child.id as string,
+      id:              ids.item_id,
+      child_id:        ids.child_id,
       child_full_name: `${input.firstName.trim()} ${input.lastName.trim()}`,
       first_name:      input.firstName.trim(),
       last_name:       input.lastName.trim(),
