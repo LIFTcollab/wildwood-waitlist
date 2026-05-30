@@ -44,8 +44,6 @@ export default async function DashboardPage() {
     { data: terms },
     { data: waitlistItems },
     { count: openTaskCount },
-    { count: urgentTaskCount },
-    { count: activeFamilies },
     { data: taskRows },
   ] = await Promise.all([
     supabase
@@ -57,12 +55,6 @@ export default async function DashboardPage() {
       .from("wl_tasks")
       .select("*", { count: "exact", head: true })
       .neq("status", "Done"),
-    supabase
-      .from("wl_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("priority", "Urgent")
-      .neq("status", "Done"),
-    supabase.from("wl_families").select("*", { count: "exact", head: true }),
     supabase
       .from("waitlist_tasks_view")
       .select(
@@ -87,12 +79,7 @@ export default async function DashboardPage() {
     if (item.status === "Inactive")   termStatsMap[item.term_id].inactive++;
   }
 
-  // Global totals
-  const totalWaitlist  = (waitlistItems ?? []).length;
-  const totalEnrolled  = Object.values(termStatsMap).reduce((s, t) => s + t.enrolled, 0);
-  const open           = openTaskCount ?? 0;
-  const urgent         = urgentTaskCount ?? 0;
-  const families       = activeFamilies ?? 0;
+  const open = openTaskCount ?? 0;
 
   // Split terms and build chart data arrays
   const emptyStats: TermStats = { total: 0, enrolled: 0, waitlisted: 0, declined: 0, inactive: 0 };
@@ -118,39 +105,6 @@ export default async function DashboardPage() {
           <h1 className="font-serif text-[28px] font-medium tracking-tight text-text leading-snug">
             Waitlists by School Term
           </h1>
-          <p className="mt-1.5 font-mono text-[13px] text-text-2">
-            {open} open task{open !== 1 ? "s" : ""}
-            {urgent > 0 ? ` · ${urgent} urgent` : ""}
-          </p>
-        </div>
-
-        {/* Global stat cards */}
-        <div className="grid grid-cols-4 gap-3 mb-10">
-          <StatCard
-            label="On waitlist"
-            value={totalWaitlist}
-            sub="across all terms"
-            sparkline="green"
-          />
-          <StatCard
-            label="Enrolled"
-            value={totalEnrolled}
-            sub="all active terms"
-            sparkline="gold"
-          />
-          <StatCard
-            label="Open tasks"
-            value={open}
-            sub={urgent > 0 ? `${urgent} urgent` : "none urgent"}
-            sparkline="terra"
-            subHighlight={urgent > 0}
-          />
-          <StatCard
-            label="Active families"
-            value={families}
-            sub="all time"
-            sparkline="blue"
-          />
         </div>
 
         {/* Open terms */}
@@ -193,68 +147,6 @@ function SectionDivider({ label, accent }: { label: string; accent: "green" | "m
         {label}
       </span>
       <div className="flex-1 h-px bg-border" />
-    </div>
-  );
-}
-
-
-
-type SparkVariant = "green" | "gold" | "terra" | "blue";
-
-const SPARK_HEIGHTS = [30, 42, 38, 55, 50, 68, 82, 100];
-const SPARK_COLORS: Record<SparkVariant, { soft: string; full: string }> = {
-  green: { soft: "var(--green-soft)", full: "var(--green)" },
-  gold:  { soft: "var(--gold-soft)",  full: "var(--gold)"  },
-  terra: { soft: "var(--terra-soft)", full: "var(--terra)" },
-  blue:  { soft: "var(--blue-soft)",  full: "var(--blue)"  },
-};
-
-function Sparkline({ variant }: { variant: SparkVariant }) {
-  const { soft, full } = SPARK_COLORS[variant];
-  return (
-    <div className="flex items-end gap-0.5 h-6">
-      {SPARK_HEIGHTS.map((h, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-[1px]"
-          style={{ height: `${h}%`, minHeight: 3, background: i >= 6 ? full : soft }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  sparkline,
-  subHighlight = false,
-}: {
-  label: string;
-  value: number;
-  sub: string;
-  sparkline: SparkVariant;
-  subHighlight?: boolean;
-}) {
-  return (
-    <div className="bg-surface border border-border rounded-[10px] p-[18px] hover:border-border-strong hover:-translate-y-px transition-all">
-      <div className="mb-2.5">
-        <span className="text-[11.5px] font-semibold uppercase tracking-[0.06em] text-text-2">
-          {label}
-        </span>
-      </div>
-      <div className="font-serif text-[38px] font-medium tracking-tight leading-none text-text mb-2.5 tabular-nums">
-        {value}
-      </div>
-      <Sparkline variant={sparkline} />
-      <div
-        className={`mt-2 font-mono text-[11.5px] ${
-          subHighlight ? "text-terra" : "text-text-3"
-        }`}
-      >
-        {sub}
-      </div>
     </div>
   );
 }

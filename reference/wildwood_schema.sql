@@ -549,7 +549,7 @@ BEGIN
     WHEN EXISTS (SELECT 1 FROM public.wl_parents p WHERE p.family_id = p_family_id AND p.school_history::text = 'Alumni')  THEN 3
     WHEN (SELECT COUNT(DISTINCT sib.id) FROM public.wl_children sib
           JOIN public.wl_waitlist_items wi ON wi.child_id = sib.id
-          WHERE sib.family_id = p_family_id AND wi.status::text = ANY(ARRAY['Enrolled','Waitlisted'])) > 1 THEN 4
+          WHERE sib.family_id = p_family_id AND wi.status::text = 'Enrolled') > 1 THEN 4
     ELSE 5
   END INTO v_prank;
   UPDATE public.wl_families
@@ -895,6 +895,14 @@ GRANT EXECUTE ON FUNCTION public.wl_create_waitlist_entry(
 --             PUBLIC/anon/authenticated on all internal/trigger functions, and
 --             from anon on wl_create_waitlist_entry.
 --             Migration: migrations/reharden_internal_function_execute_grants.sql
+-- 2026-05-30  Dashboard: removed "X open tasks" subtitle and 4-card stat section
+--             (On Waitlist / Enrolled / Open Tasks / Active Families). Cleaned up
+--             urgentTaskCount and activeFamilies queries and all dead sub-components
+--             (StatCard, Sparkline) from dashboard/page.tsx. UI change only.
+-- 2026-05-30  Sibling priority: fn_recompute_family_priority now requires Enrolled
+--             status only (was Enrolled OR Waitlisted) to award Sibling priority (rank 4).
+--             Migration: migrations/fix_sibling_priority_enrolled_only.sql
+--             EXECUTE re-revoked from PUBLIC/anon/authenticated after CREATE OR REPLACE.
 -- 2026-05-28  Schema file regenerated from the live database (this document).
 --             Reconciled table/view/policy/function names to the wl_ prefix and
 --             current definitions. Known mismatch surfaced (NOT yet changed):
