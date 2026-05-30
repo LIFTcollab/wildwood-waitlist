@@ -26,7 +26,7 @@ export default async function ChildrenPage() {
       user
         ? supabase
             .from("user_profiles_view")
-            .select("role")
+            .select("role, organization_name")
             .eq("id", user.id)
             .single()
         : Promise.resolve({ data: null, error: null }),
@@ -58,12 +58,16 @@ export default async function ChildrenPage() {
   const canEdit =
     profile?.role === "Admin" || profile?.role === "Director";
 
+  const pageTitle = profile?.organization_name
+    ? `${profile.organization_name} Waitlist`
+    : "Waitlist";
+
   return (
     <div className="p-8">
       {/* Page header */}
       <div className="mb-6">
         <h1 className="font-serif text-[26px] font-medium text-text leading-tight">
-          Full Waitlist
+          {pageTitle}
         </h1>
       </div>
 
