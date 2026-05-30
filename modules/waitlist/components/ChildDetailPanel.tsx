@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { WaitlistItem, SchoolTerm } from "@/modules/waitlist/types";
 import { PriorityPill, StatusPill, formatDate, formatMonthYear } from "./WaitlistTable";
-import { updateWaitlistItem, createTask } from "@/modules/waitlist/lib/actions/waitlist";
+import { updateWaitlistItem, createTask, deleteWaitlistItem } from "@/modules/waitlist/lib/actions/waitlist";
 import { updateTask } from "@/modules/waitlist/lib/actions/tasks";
 import { updateParent, addParent, deleteParent, type ParentData } from "@/modules/waitlist/lib/actions/families";
 import { createClient } from "@/lib/supabase/client";
@@ -169,6 +169,7 @@ export function ChildDetailPanel({
   taskCount = 0,
   onClose,
   onSave,
+  onDelete,
 }: {
   item: WaitlistItem | null;
   terms: SchoolTerm[];
@@ -176,6 +177,7 @@ export function ChildDetailPanel({
   taskCount?: number;
   onClose: () => void;
   onSave: (updated: WaitlistItem) => void;
+  onDelete: (id: string) => void;
 }) {
   const [isEditing,     setIsEditing]     = useState(false);
   const [saving,        setSaving]        = useState(false);
@@ -193,6 +195,11 @@ export function ChildDetailPanel({
   const [parentSaveError,  setParentSaveError]   = useState<string | null>(null);
   const [confirmDeleteKey, setConfirmDeleteKey]  = useState<string | null>(null);
   const [deleteParentErr,  setDeleteParentErr]   = useState<string | null>(null);
+
+  // Delete state
+  const [confirmDelete,  setConfirmDelete]  = useState(false);
+  const [deleting,       setDeleting]       = useState(false);
+  const [deleteError,    setDeleteError]    = useState<string | null>(null);
 
   // Task state
   const [tasks,          setTasks]          = useState<TaskInfo[]>([]);
@@ -217,6 +224,9 @@ export function ChildDetailPanel({
     setParentSaveError(null);
     setConfirmDeleteKey(null);
     setDeleteParentErr(null);
+    setConfirmDelete(false);
+    setDeleting(false);
+    setDeleteError(null);
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch family info whenever the selected child changes
@@ -535,6 +545,20 @@ export function ChildDetailPanel({
       setEditingText(prevEditingText);
       setTaskError(error);
     }
+  }
+
+  async function handleDelete() {
+    if (!item) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await deleteWaitlistItem(item.id);
+    if (error) {
+      setDeleteError(error);
+      setDeleting(false);
+      setConfirmDelete(false);
+      return;
+    }
+    onDelete(item.id);
   }
 
   const displayName = isEditing
@@ -1105,6 +1129,48 @@ export function ChildDetailPanel({
                 )}
               </div>
           </>
+
+          {/* ── Delete waitlist item ─────────────────────────────────── */}
+          {canEdit && !isEditing && (
+            <>
+              <div className="border-t border-border" />
+              <div>
+                {!confirmDelete ? (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="text-[12.5px] text-text-3 hover:text-terra transition-colors"
+                  >
+                    Delete waitlist entry…
+                  </button>
+                ) : (
+                  <div className="rounded-xl border border-terra/30 bg-terra-soft/40 p-4 space-y-2.5">
+                    <p className="text-[13px] text-text leading-snug">
+                      Delete this waitlist entry and all its tasks? The child and family record will not be affected.
+                    </p>
+                    {deleteError && (
+                      <p className="text-[12px] text-terra">{deleteError}</p>
+                    )}
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white bg-terra hover:bg-terra/80 transition-colors disabled:opacity-50"
+                      >
+                        {deleting ? "Deleting…" : "Yes, delete"}
+                      </button>
+                      <button
+                        onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
+                        disabled={deleting}
+                        className="text-[12.5px] text-text-3 hover:text-text transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Save error */}
           {saveError && (

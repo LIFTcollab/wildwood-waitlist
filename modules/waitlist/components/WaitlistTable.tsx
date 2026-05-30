@@ -276,6 +276,11 @@ export function WaitlistTable({
     setSelected(updated);
   }
 
+  function handleDelete(id: string) {
+    setLocalItems((prev) => prev.filter((i) => i.id !== id));
+    setSelected(null);
+  }
+
   function handleCreated(item: WaitlistItem) {
     // Clear all filters so the newly added child is guaranteed to be visible
     setSearch("");
@@ -616,6 +621,7 @@ export function WaitlistTable({
         taskCount={selected ? (taskCounts[selected.id] ?? 0) : 0}
         onClose={() => setSelected(null)}
         onSave={handleSave}
+        onDelete={handleDelete}
       />
 
       {/* ── Add child modal ──────────────────────────────────────────────── */}

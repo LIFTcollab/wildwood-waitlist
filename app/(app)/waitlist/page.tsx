@@ -58,8 +58,6 @@ export default async function ChildrenPage() {
   const canEdit =
     profile?.role === "Admin" || profile?.role === "Director";
 
-  const count = items?.length ?? 0;
-
   return (
     <div className="p-8">
       {/* Page header */}
@@ -67,10 +65,6 @@ export default async function ChildrenPage() {
         <h1 className="font-serif text-[26px] font-medium text-text leading-tight">
           Full Waitlist
         </h1>
-        <p className="mt-1 text-[13.5px] text-text-2">
-          <span className="font-mono">{count}</span>{" "}
-          {count === 1 ? "waitlist entry" : "waitlist entries"}
-        </p>
       </div>
 
       <WaitlistTable items={items ?? []} terms={terms ?? []} canEdit={canEdit} taskCounts={taskCounts} />

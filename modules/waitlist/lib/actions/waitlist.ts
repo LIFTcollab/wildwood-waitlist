@@ -44,6 +44,43 @@ export async function updateWaitlistItem(
   return { error: null };
 }
 
+export async function deleteWaitlistItem(
+  id: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!["Admin", "Director"].includes(profile?.role ?? ""))
+    return { error: "Only Admins and Directors can delete waitlist entries" };
+
+  // Delete tasks first (FK constraint: wl_tasks.waitlist_item_id → wl_waitlist_items.id)
+  const { error: tasksError } = await supabase
+    .from("wl_tasks")
+    .delete()
+    .eq("waitlist_item_id", id);
+
+  if (tasksError) return { error: tasksError.message };
+
+  const { error: itemError } = await supabase
+    .from("wl_waitlist_items")
+    .delete()
+    .eq("id", id);
+
+  if (itemError) return { error: itemError.message };
+
+  revalidatePath("/waitlist");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function createTask(
   waitlistItemId: string,
   description: string
